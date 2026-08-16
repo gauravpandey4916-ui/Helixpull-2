@@ -254,9 +254,7 @@
       DOM.video.style.display = "none";
       DOM.iframe.style.display = "block";
       
-      // Clear src first to reset the frame context
       DOM.iframe.src = "about:blank";
-      
       setTimeout(() => {
         DOM.iframe.src = url;
         showToast("Stream Loaded");
@@ -300,9 +298,11 @@
       });
 
       try {
-        await player.load(streamData.streamUrl);
+        const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(streamData.streamUrl);
+        await player.load(proxiedUrl);
         showToast("Stream Playing");
       } catch (err) {
+        console.error(err);
         showError("Playback error. Network restricted.");
       }
     }
