@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#0a1733">
-  <meta name="referrer" content="no-referrer">
-  <title>HELIXPULL Premium Stream</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0a1733" />
+  <meta name="referrer" content="no-referrer" />
+  <title>HELIXPULL Live Stream</title>
 
   <!-- Google tag (gtag.js) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-SMZXC121E6"></script>
@@ -17,26 +17,25 @@
   </script>
 
   <!-- Shaka Player CDN -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css" crossorigin="anonymous">
-  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.min.js" crossorigin="anonymous"></script>
 
   <style>
     :root {
       --blue1: #0b3b8c;
       --blue2: #072b6a;
-      --bg: #060e20;
+      --bg: #0a1733;
       --text: #ffffff;
-      --accent-gold: #ffd700;
-      --gold-gradient: linear-gradient(135deg, #ffe57f 0%, #ffd700 50%, #c79a00 100%);
-      --card-border: rgba(255, 215, 0, 0.35);
-      --shadow: rgba(0, 0, 0, 0.6);
-      --transition: all 0.25s ease;
+      --accent: #1e78ff;
+      --card-border: rgba(30, 120, 255, 0.25);
+      --shadow: rgba(0, 0, 0, 0.25);
+      --transition: all 0.2s ease;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
@@ -49,27 +48,23 @@
 
     .header {
       background: linear-gradient(135deg, var(--blue1), var(--blue2));
-      font-weight: 900;
-      font-size: 22px;
+      font-weight: 800;
       text-align: center;
-      padding: 14px 16px;
+      padding: 12px 16px;
       border-radius: 12px;
-      letter-spacing: 1px;
-      color: var(--accent-gold);
-      text-transform: uppercase;
-      box-shadow: 0 8px 24px var(--shadow), 0 0 15px rgba(255, 215, 0, 0.15);
-      border: 1px solid var(--card-border);
-      margin-bottom: 14px;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 0.4px;
+      box-shadow: 0 8px 20px var(--shadow);
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 12px;
     }
 
     .player-panel {
       background: #000;
-      border-radius: 12px;
+      border-radius: 10px;
       overflow: hidden;
       margin: 12px 0;
-      box-shadow: 0 10px 30px var(--shadow), 0 0 20px rgba(255, 215, 0, 0.2);
-      border: 2px solid var(--card-border);
+      box-shadow: 0 10px 26px var(--shadow);
+      border: 3px solid var(--card-border);
       position: relative;
     }
 
@@ -89,103 +84,123 @@
 
     .error-overlay {
       position: absolute; inset: 0;
-      background: rgba(6, 14, 32, 0.95);
+      background: rgba(0,0,0,0.9);
       display: none; flex-direction: column;
       align-items: center; justify-content: center;
-      z-index: 11; gap: 14px; padding: 20px; text-align: center;
+      z-index: 11; gap: 12px; padding: 20px; text-align: center;
     }
     .error-overlay.visible { display: flex; }
-    .error-message { font-size: 16px; color: var(--accent-gold); max-width: 340px; font-weight: 600; }
+    .error-message { font-size: 15px; opacity: 0.9; max-width: 320px; }
+
+    .retry-btn {
+      padding: 10px 24px; border-radius: 8px;
+      background: var(--accent); color: #fff; border: none;
+      font-weight: 700; font-size: 14px; cursor: pointer; transition: var(--transition);
+    }
+    .retry-btn:hover { background: #3388ff; transform: translateY(-1px); }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(30,30,30,0.95); color: #fff;
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 600;
+      z-index: 2000; pointer-events: none; opacity: 0;
+      transition: all 0.35s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     .section {
       background: linear-gradient(135deg, var(--blue1), var(--blue2));
-      border-radius: 12px; padding: 16px; margin: 14px 0;
+      border-radius: 12px; padding: 14px; margin: 12px 0;
       box-shadow: 0 8px 20px var(--shadow);
-      border: 1px solid var(--card-border);
+      border: 1px solid rgba(255,255,255,0.08);
     }
-
-    .section-title { 
-      margin-bottom: 12px; 
-      text-align: center; 
-      font-size: 18px; 
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: 0.5px; 
-    }
-
+    .section-title { margin: 0 0 10px; text-align: center; font-size: 18px; letter-spacing: 0.2px; }
     .section-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .section-wrapper { display: flex; gap: 12px; }
+    .section-wrapper .section { flex: 1; margin: 0; }
 
     .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 12px 24px; border-radius: 10px;
-      font-weight: 800; font-size: 14px;
-      background: var(--gold-gradient);
-      color: #060e20;
-      border: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 12px;
+      font-weight: 700; font-size: 14px;
+      background: transparent; color: #fff;
+      border: 2px solid rgba(255,255,255,0.85);
       text-decoration: none; cursor: pointer; transition: var(--transition);
-      box-shadow: 0 4px 12px rgba(255, 215, 0, 0.2);
     }
-    .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(255, 215, 0, 0.4); }
+    .btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
 
     .popup-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(4px);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
       display: none; align-items: center; justify-content: center;
       z-index: 1000; padding: 20px;
     }
     .popup-overlay.visible { display: flex; }
     .popup-card {
-      background: linear-gradient(135deg, #0d2247, #072b6a);
+      background: linear-gradient(135deg, #1a3a6e, #0d2247);
       border-radius: 16px; padding: 28px; text-align: center;
       max-width: 380px; width: 100%;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 25px rgba(255, 215, 0, 0.25);
-      border: 1.5px solid var(--accent-gold);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
     }
-    .popup-title { font-size: 22px; font-weight: 800; margin-bottom: 16px; color: var(--accent-gold); }
+    .popup-title { font-size: 22px; font-weight: 800; margin-bottom: 20px; }
     .popup-btn {
       display: block; width: 100%; padding: 12px; border: none;
-      border-radius: 10px; font-weight: 800; font-size: 15px;
+      border-radius: 10px; font-weight: 700; font-size: 15px;
       cursor: pointer; margin-top: 10px; transition: var(--transition);
     }
-    .popup-btn-primary { background: var(--gold-gradient); color: #060e20; }
+    .popup-btn-primary { background: #0088cc; color: #fff; }
     .popup-btn-secondary { background: rgba(255,255,255,0.12); color: #fff; }
 
     @media (max-width: 600px) {
-      .btn { width: 100%; }
+      .section-wrapper { flex-direction: column; }
+      .btn { width: 100%; justify-content: center; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">HELIXPULL VIP STREAM</div>
+    <div class="header">HELIXPULL MATCH CENTRE</div>
     
     <div class="player-panel">
-      <div class="player-wrapper shaka-mobile shaka-video-container" data-shaka-player-container id="playerContainer" shaka-controls="true">
-        <video id="video" class="video-player shaka-video" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
+      <div class="player-wrapper" data-shaka-player-container id="playerContainer">
+        <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
         <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
         
         <div id="errorOverlay" class="error-overlay">
-          <p id="errorMsg" class="error-message">Connecting to live feed...</p>
-          <button class="btn" id="retryBtn">Retry Stream</button>
+          <p id="errorMsg" class="error-message">Loading Stream...</p>
+          <button class="retry-btn" id="retryBtn">Retry</button>
         </div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-title" id="channelNameDisplay">Loading Channel...</div>
-      <div class="section-row">
-        <button class="btn" id="btnShare">Share Stream</button>
-        <button class="btn" id="btnCopy">Copy Link</button>
+    <div id="toast" class="toast"></div>
+
+    <!-- Telegram Popup -->
+    <div id="tgPopup" class="popup-overlay">
+      <div class="popup-card">
+        <div class="popup-title">Join helixpull</div>
+        <button class="popup-btn popup-btn-primary" id="tgJoinBtn1">Join Telegram</button>
+        <button class="popup-btn popup-btn-secondary" id="tgCloseBtn">Already Joined</button>
       </div>
     </div>
-  </div>
 
-  <div id="tgPopup" class="popup-overlay">
-    <div class="popup-card">
-      <div class="popup-title">Join Telegram Channel</div>
-      <p style="color: #cbd5e1; margin-bottom: 20px; font-size: 14px;">Access premium live channels and instant match updates.</p>
-      <button class="popup-btn popup-btn-primary" id="tgJoinBtn">Join Telegram</button>
-      <button class="popup-btn popup-btn-secondary" id="tgCloseBtn">Continue to Player</button>
+    <!-- Section Links -->
+    <div class="section-wrapper">
+      <div class="section">
+        <h3 class="section-title">Follow Us for Updates</h3>
+        <div class="section-row">
+          <a class="btn" id="joinTgBtn1" target="_blank" rel="noopener noreferrer">Join HELIXPULL Telegram</a>
+        </div>
+      </div>
+      <div class="section">
+        <h3 class="section-title">Share with Friends</h3>
+        <div class="section-row">
+          <button class="btn" id="btnShare">Share Stream Link</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -194,148 +209,176 @@
 
     const CONFIG = {
       telegramLink: "https://telegram.me/helixpull",
-      dataEndpoint: "https://allrounder2-0.pages.dev/api/Hindi.json"
+      dataEndpoint: "https://allrounderid2.pages.dev/id.json"
     };
 
-    let shakaPlayer = null;
-    let shakaUI = null;
+    const DOM = {
+      video: document.getElementById("video"),
+      iframe: document.getElementById("main-iframe"),
+      playerContainer: document.getElementById("playerContainer"),
+      errorOverlay: document.getElementById("errorOverlay"),
+      errorMsg: document.getElementById("errorMsg"),
+      retryBtn: document.getElementById("retryBtn"),
+      tgPopup: document.getElementById("tgPopup"),
+      toast: document.getElementById("toast"),
+      btnShare: document.getElementById("btnShare"),
+      joinTgBtn1: document.getElementById("joinTgBtn1"),
+      tgJoinBtn1: document.getElementById("tgJoinBtn1"),
+      tgCloseBtn: document.getElementById("tgCloseBtn")
+    };
 
-    function showError(msg) {
-      const errOverlay = document.getElementById("errorOverlay");
-      document.getElementById("errorMsg").textContent = msg;
-      errOverlay.classList.add("visible");
+    let player = null;
+    let ui = null;
+    let toastTimer = null;
+
+    function showToast(msg = "", duration = 2600) {
+      clearTimeout(toastTimer);
+      DOM.toast.textContent = msg;
+      DOM.toast.classList.add("show");
+      toastTimer = setTimeout(() => DOM.toast.classList.remove("show"), duration);
+    }
+
+    function showError(msg = "") {
+      DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
+      DOM.errorOverlay.classList.add("visible");
+      DOM.video.style.display = "none";
+      DOM.iframe.style.display = "none";
     }
 
     function hideError() {
-      document.getElementById("errorOverlay").classList.remove("visible");
+      DOM.errorOverlay.classList.remove("visible");
     }
 
-    async function initShakaEngine() {
-      if (shakaPlayer) return;
+    function loadIframe(url) {
+      hideError();
+      DOM.video.style.display = "none";
+      DOM.iframe.style.display = "block";
       
-      shaka.polyfill.installAll();
-      if (!shaka.Player.isBrowserSupported()) {
-        showError("Browser is not supported for native DASH streams.");
+      DOM.iframe.src = "about:blank";
+      setTimeout(() => {
+        DOM.iframe.src = url;
+        showToast("Stream Loaded");
+      }, 50);
+    }
+
+    async function loadShakaPlayer(streamData = {}) {
+      hideError();
+      DOM.iframe.style.display = "none";
+      DOM.video.style.display = "block";
+
+      if (!window.shaka || !shaka.Player.isBrowserSupported()) {
+        showError("Browser does not support live video player.");
         return;
       }
 
-      const video = document.getElementById("video");
-      const container = document.getElementById("playerContainer");
+      if (!ui) {
+        ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
+        player = ui.getControls().getPlayer();
+        player.addEventListener("error", () => showError("Stream Error. Retry."));
+      }
 
-      shakaPlayer = new shaka.Player(video);
-      shakaUI = new shaka.ui.Overlay(shakaPlayer, container, video);
+      if (streamData.drm && streamData.drm.clearKeys) {
+        player.configure({ drm: { clearKeys: streamData.drm.clearKeys } });
+      }
 
-      shakaPlayer.addEventListener("error", (e) => {
-        console.error("Shaka Error Details:", e.detail);
-        showError("Playback error. Please retry.");
+      player.getNetworkingEngine().clearAllRequestFilters();
+      player.getNetworkingEngine().registerRequestFilter((type, request) => {
+        if (streamData.cookie) {
+          const rawToken = streamData.cookie.replace(/^__hdnea__=/, "").replace(/^Cookie:\s*/i, "").trim();
+          if (
+            (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+             type === shaka.net.NetworkingEngine.RequestType.SEGMENT) &&
+            request.uris[0] &&
+            !request.uris[0].includes("__hdnea__=")
+          ) {
+            const sep = request.uris[0].includes("?") ? "&" : "?";
+            request.uris[0] += sep + "__hdnea__=" + rawToken;
+          }
+        }
       });
+
+      try {
+        const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(streamData.streamUrl);
+        await player.load(proxiedUrl);
+        showToast("Stream Playing");
+      } catch (err) {
+        console.error(err);
+        showError("Playback error. Network restricted.");
+      }
     }
 
     async function startStream() {
       hideError();
-      const videoEl = document.getElementById("video");
-      const iframeEl = document.getElementById("main-iframe");
-
       try {
         const urlParams = new URLSearchParams(window.location.search);
-        const requestedId = (urlParams.get("id") || "").trim().toLowerCase();
+        const requestedId = (urlParams.get("id") || "").trim();
 
         const response = await fetch(CONFIG.dataEndpoint, { cache: "no-store" });
-        if (!response.ok) throw new Error("Could not load channel playlist.");
-        
+        if (!response.ok) throw new Error("Unable to fetch stream configuration.");
+
         const data = await response.json();
-        
-        // Find target item safely across variations
-        let target = null;
+
+        let targetData = null;
         if (Array.isArray(data)) {
-          target = data.find(item => item.id && item.id.toString().toLowerCase() === requestedId) || data[0];
-        } else if (typeof data === "object") {
-          target = data[requestedId] || data;
-        }
-
-        if (!target) {
-          showError("Channel not found.");
-          return;
-        }
-
-        // Update Channel Title
-        document.getElementById("channelNameDisplay").textContent = target.name || target.title || "Live Stream";
-
-        const streamUrl = target.streamUrl || target.link || target.url;
-        const iframeSrc = target.iframeSrc || target.iframe;
-
-        // Case A: Embed via Iframe
-        if (target.type === "iframe" || iframeSrc || (streamUrl && streamUrl.includes("pages.dev"))) {
-          if (shakaPlayer) {
-            await shakaPlayer.unload();
-          }
-          videoEl.style.display = "none";
-          iframeEl.style.display = "block";
-          iframeEl.src = iframeSrc || streamUrl;
-          return;
-        }
-
-        // Case B: Direct Stream (DASH .mpd / HLS .m3u8)
-        iframeEl.style.display = "none";
-        iframeEl.src = "";
-        videoEl.style.display = "block";
-
-        await initShakaEngine();
-
-        // Handle ClearKeys DRM
-        if (target.drm && target.drm.clearKeys) {
-          shakaPlayer.configure({ drm: { clearKeys: target.drm.clearKeys } });
-        } else if (target.keyId && target.key) {
-          shakaPlayer.configure({ drm: { clearKeys: { [target.keyId]: target.key } } });
-        }
-
-        if (streamUrl) {
-          await shakaPlayer.load(streamUrl);
-          videoEl.play().catch(() => {});
+          targetData = data.find(item => item.id === requestedId) || data[0];
+        } else if (data.iframes) {
+          targetData = data.iframes.find(item => item.id === requestedId) || data.iframes[0];
         } else {
-          showError("Invalid stream source URL.");
+          targetData = data;
         }
 
+        if (!targetData) throw new Error("Channel ID not found.");
+
+        if (targetData.iframeSrc || targetData.type === "iframe") {
+          if (targetData.hit) fetch(targetData.hit).catch(() => {});
+          loadIframe(targetData.iframeSrc);
+          return;
+        }
+
+        if (targetData.streamUrl) {
+          await loadShakaPlayer(targetData);
+          return;
+        }
+
+        throw new Error("No valid stream source found.");
       } catch (err) {
-        console.error("Stream initialization failed:", err);
-        showError("Failed to fetch stream data. Click retry.");
+        showError(err && err.message ? err.message : "Failed to load stream.");
       }
+    }
+
+    async function handleShare() {
+      if (navigator.share) {
+        try { 
+          await navigator.share({ title: document.title, url: window.location.href }); 
+          return; 
+        } catch {}
+      }
+      navigator.clipboard.writeText(window.location.href);
+      showToast("Link copied!");
     }
 
     function initEvents() {
-      document.getElementById("retryBtn").addEventListener("click", startStream);
-
-      const copyUrl = () => {
-        navigator.clipboard.writeText(window.location.href);
-        alert("Stream link copied to clipboard!");
-      };
-
-      document.getElementById("btnShare").addEventListener("click", copyUrl);
-      document.getElementById("btnCopy").addEventListener("click", copyUrl);
-
-      const handleAuth = () => {
+      DOM.retryBtn.addEventListener("click", startStream);
+      DOM.btnShare.addEventListener("click", handleShare);
+      
+      const openTg = () => {
         window.open(CONFIG.telegramLink, "_blank");
-        document.getElementById("tgPopup").classList.remove("visible");
-        sessionStorage.setItem("helix_auth", "true");
+        DOM.tgPopup.classList.remove("visible");
         startStream();
       };
 
-      document.getElementById("tgJoinBtn").addEventListener("click", handleAuth);
-      document.getElementById("tgCloseBtn").addEventListener("click", () => {
-        document.getElementById("tgPopup").classList.remove("visible");
-        sessionStorage.setItem("helix_auth", "true");
+      DOM.tgJoinBtn1.addEventListener("click", openTg);
+      DOM.tgCloseBtn.addEventListener("click", () => {
+        DOM.tgPopup.classList.remove("visible");
         startStream();
       });
 
-      if (sessionStorage.getItem("helix_auth") === "true") {
-        document.getElementById("tgPopup").classList.remove("visible");
-        startStream();
-      } else {
-        document.getElementById("tgPopup").classList.add("visible");
-      }
+      DOM.joinTgBtn1.href = CONFIG.telegramLink;
+      window.addEventListener("load", () => DOM.tgPopup.classList.add("visible"));
     }
 
-    document.addEventListener("DOMContentLoaded", initEvents);
+    shaka.polyfill.installAll();
+    initEvents();
   </script>
 </body>
 </html>
