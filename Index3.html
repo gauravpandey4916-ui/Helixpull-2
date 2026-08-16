@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#0a1733" />
+  <meta name="referrer" content="no-referrer" />
+  <title>HELIXPULL Live Stream</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SMZXC121E6"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-SMZXC121E6');
+  </script>
+
+  <!-- Shaka Player CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    :root {
+      --blue1: #0b3b8c;
+      --blue2: #072b6a;
+      --bg: #0a1733;
+      --text: #ffffff;
+      --accent: #1e78ff;
+      --card-border: rgba(30, 120, 255, 0.25);
+      --shadow: rgba(0, 0, 0, 0.25);
+      --transition: all 0.2s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-user-select: none;
+      user-select: none;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 980px; margin: 14px auto 0; padding: 0 12px 24px; }
+
+    .header {
+      background: linear-gradient(135deg, var(--blue1), var(--blue2));
+      font-weight: 800;
+      text-align: center;
+      padding: 12px 16px;
+      border-radius: 12px;
+      letter-spacing: 0.4px;
+      box-shadow: 0 8px 20px var(--shadow);
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 12px;
+    }
+
+    .player-panel {
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 12px 0;
+      box-shadow: 0 10px 26px var(--shadow);
+      border: 3px solid var(--card-border);
+      position: relative;
+    }
+
+    .player-wrapper { width: 100%; position: relative; aspect-ratio: 16/9; background: #000; }
+    
+    .video-player, #main-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .shaka-spinner-container, .shaka-buffering-spinner, .shaka-spinner { display: none !important; }
+
+    .error-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 11; gap: 12px; padding: 20px; text-align: center;
+    }
+    .error-overlay.visible { display: flex; }
+    .error-message { font-size: 15px; opacity: 0.9; max-width: 320px; }
+
+    .retry-btn {
+      padding: 10px 24px; border-radius: 8px;
+      background: var(--accent); color: #fff; border: none;
+      font-weight: 700; font-size: 14px; cursor: pointer; transition: var(--transition);
+    }
+    .retry-btn:hover { background: #3388ff; transform: translateY(-1px); }
+
+    .toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: rgba(30,30,30,0.95); color: #fff;
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 600;
+      z-index: 2000; pointer-events: none; opacity: 0;
+      transition: all 0.35s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4); white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .section {
+      background: linear-gradient(135deg, var(--blue1), var(--blue2));
+      border-radius: 12px; padding: 14px; margin: 12px 0;
+      box-shadow: 0 8px 20px var(--shadow);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .section-title { margin: 0 0 10px; text-align: center; font-size: 18px; letter-spacing: 0.2px; }
+    .section-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    .section-wrapper { display: flex; gap: 12px; }
+    .section-wrapper .section { flex: 1; margin: 0; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 16px; border-radius: 12px;
+      font-weight: 700; font-size: 14px;
+      background: transparent; color: #fff;
+      border: 2px solid rgba(255,255,255,0.85);
+      text-decoration: none; cursor: pointer; transition: var(--transition);
+    }
+    .btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-1px); }
+
+    .popup-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    .popup-overlay.visible { display: flex; }
+    .popup-card {
+      background: linear-gradient(135deg, #1a3a6e, #0d2247);
+      border-radius: 16px; padding: 28px; text-align: center;
+      max-width: 380px; width: 100%;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .popup-title { font-size: 22px; font-weight: 800; margin-bottom: 20px; }
+    .popup-btn {
+      display: block; width: 100%; padding: 12px; border: none;
+      border-radius: 10px; font-weight: 700; font-size: 15px;
+      cursor: pointer; margin-top: 10px; transition: var(--transition);
+    }
+    .popup-btn-primary { background: #0088cc; color: #fff; }
+    .popup-btn-secondary { background: rgba(255,255,255,0.12); color: #fff; }
+
+    @media (max-width: 600px) {
+      .section-wrapper { flex-direction: column; }
+      .btn { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">HELIXPULL</div>
+    
+    <div class="player-panel">
+      <div class="player-wrapper" data-shaka-player-container id="playerContainer">
+        <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
+        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
+        
+        <div id="errorOverlay" class="error-overlay">
+          <p id="errorMsg" class="error-message">Loading Stream...</p>
+          <button class="retry-btn" id="retryBtn">Retry</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- Telegram Popup -->
+    <div id="tgPopup" class="popup-overlay">
+      <div class="popup-card">
+        <div class="popup-title">Join HELIXPULL</div>
+        <button class="popup-btn popup-btn-primary" id="tgJoinBtn1">Join Telegram</button>
+        <button class="popup-btn popup-btn-secondary" id="tgCloseBtn">Already Joined</button>
+      </div>
+    </div>
+
+    <!-- Section Links -->
+    <div class="section-wrapper">
+      <div class="section">
+        <h3 class="section-title">Follow Us for Updates</h3>
+        <div class="section-row">
+          <a class="btn" id="joinTgBtn1" target="_blank" rel="noopener noreferrer">Join HELIXPULL Telegram</a>
+        </div>
+      </div>
+      <div class="section">
+        <h3 class="section-title">Share with Friends</h3>
+        <div class="section-row">
+          <button class="btn" id="btnShare">Share Stream Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const CONFIG = {
+      telegramLink: "https://telegram.me/helixpull",
+      dataEndpoint: "https://matcheslinkz.pages.dev/id.json"
+    };
+
+    const DOM = {
+      video: document.getElementById("video"),
+      iframe: document.getElementById("main-iframe"),
+      playerContainer: document.getElementById("playerContainer"),
+      errorOverlay: document.getElementById("errorOverlay"),
+      errorMsg: document.getElementById("errorMsg"),
+      retryBtn: document.getElementById("retryBtn"),
+      tgPopup: document.getElementById("tgPopup"),
+      toast: document.getElementById("toast"),
+      btnShare: document.getElementById("btnShare"),
+      joinTgBtn1: document.getElementById("joinTgBtn1"),
+      tgJoinBtn1: document.getElementById("tgJoinBtn1"),
+      tgCloseBtn: document.getElementById("tgCloseBtn")
+    };
+
+    let player = null;
+    let ui = null;
+    let toastTimer = null;
+
+    function showToast(msg = "", duration = 2600) {
+      clearTimeout(toastTimer);
+      DOM.toast.textContent = msg;
+      DOM.toast.classList.add("show");
+      toastTimer = setTimeout(() => DOM.toast.classList.remove("show"), duration);
+    }
+
+    function showError(msg = "") {
+      DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
+      DOM.errorOverlay.classList.add("visible");
+      DOM.video.style.display = "none";
+      DOM.iframe.style.display = "none";
+    }
+
+    function hideError() {
+      DOM.errorOverlay.classList.remove("visible");
+    }
+
+    function loadIframe(url) {
+      hideError();
+      DOM.video.style.display = "none";
+      DOM.iframe.style.display = "block";
+      
+      // Clear src first to reset the frame context
+      DOM.iframe.src = "about:blank";
+      
+      setTimeout(() => {
+        DOM.iframe.src = url;
+        showToast("Stream Loaded");
+      }, 50);
+    }
+
+    async function loadShakaPlayer(streamData = {}) {
+      hideError();
+      DOM.iframe.style.display = "none";
+      DOM.video.style.display = "block";
+
+      if (!window.shaka || !shaka.Player.isBrowserSupported()) {
+        showError("Browser does not support live video player.");
+        return;
+      }
+
+      if (!ui) {
+        ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
+        player = ui.getControls().getPlayer();
+        player.addEventListener("error", () => showError("Stream Error. Retry."));
+      }
+
+      if (streamData.drm && streamData.drm.clearKeys) {
+        player.configure({ drm: { clearKeys: streamData.drm.clearKeys } });
+      }
+
+      player.getNetworkingEngine().clearAllRequestFilters();
+      player.getNetworkingEngine().registerRequestFilter((type, request) => {
+        if (streamData.cookie) {
+          const rawToken = streamData.cookie.replace(/^__hdnea__=/, "").replace(/^Cookie:\s*/i, "").trim();
+          if (
+            (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+             type === shaka.net.NetworkingEngine.RequestType.SEGMENT) &&
+            request.uris[0] &&
+            !request.uris[0].includes("__hdnea__=")
+          ) {
+            const sep = request.uris[0].includes("?") ? "&" : "?";
+            request.uris[0] += sep + "__hdnea__=" + rawToken;
+          }
+        }
+      });
+
+      try {
+        await player.load(streamData.streamUrl);
+        showToast("Stream Playing");
+      } catch (err) {
+        showError("Playback error. Network restricted.");
+      }
+    }
+
+    async function startStream() {
+      hideError();
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestedId = (urlParams.get("id") || "").trim();
+
+        const response = await fetch(CONFIG.dataEndpoint, { cache: "no-store" });
+        if (!response.ok) throw new Error("Unable to fetch stream configuration.");
+
+        const data = await response.json();
+
+        if (data.streamUrl) {
+          await loadShakaPlayer(data);
+          return;
+        }
+
+        if (data.iframes && data.iframes.length > 0) {
+          const targetData = data.iframes.find((item = {}) => item.id === requestedId) || data.iframes[0];
+
+          if (!targetData || !targetData.iframeSrc) {
+            throw new Error("No valid stream link found.");
+          }
+
+          if (targetData.hit) fetch(targetData.hit).catch(() => {});
+
+          loadIframe(targetData.iframeSrc);
+        } else {
+          showError("No streams currently live.");
+        }
+      } catch (err) {
+        showError(err && err.message ? err.message : "Failed to load stream.");
+      }
+    }
+
+    async function handleShare() {
+      if (navigator.share) {
+        try { 
+          await navigator.share({ title: document.title, url: window.location.href }); 
+          return; 
+        } catch {}
+      }
+      navigator.clipboard.writeText(window.location.href);
+      showToast("Link copied!");
+    }
+
+    function initEvents() {
+      DOM.retryBtn.addEventListener("click", startStream);
+      DOM.btnShare.addEventListener("click", handleShare);
+      
+      const openTg = () => {
+        window.open(CONFIG.telegramLink, "_blank");
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      };
+
+      DOM.tgJoinBtn1.addEventListener("click", openTg);
+      DOM.tgCloseBtn.addEventListener("click", () => {
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      });
+
+      DOM.joinTgBtn1.href = CONFIG.telegramLink;
+      window.addEventListener("load", () => DOM.tgPopup.classList.add("visible"));
+    }
+
+    shaka.polyfill.installAll();
+    initEvents();
+  </script>
+</body>
+</html>
