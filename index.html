@@ -21,7 +21,7 @@
         href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css"
         crossorigin="anonymous" />
 
-  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.min.js"
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.js"
           crossorigin="anonymous"></script>
 
   <style>
@@ -672,8 +672,8 @@
       DOM.iframe.style.display = "none";
       DOM.video.style.display = "block";
 
-      if (!window.shaka || !shaka.Player.isBrowserSupported()) {
-        showError("Browser does not support live video player.");
+      if (!window.shaka) {
+        showError("Video engine not loaded.");
         return;
       }
 
@@ -726,4 +726,6 @@
 
         let targetData = null;
         if (Array.isArray(data)) {
-          targetData = data.find(item => item.id === requestedId) || data[
+          targetData = data.find(item => item.id === requestedId) || data[0];
+        } else if (data.iframes) {
+          targetData =
