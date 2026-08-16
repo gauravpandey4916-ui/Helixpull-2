@@ -429,7 +429,7 @@
       </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
     <script>
       "use strict";
 
@@ -441,57 +441,27 @@
       let plyrInstance = null;
       let shakaInstance = null;
 
-      function initPlyr(videoEl) {
-        if (plyrInstance) return;
-
-        const getQualityOptions = () => {
-          if (!shakaInstance) return [1080, 720, 480, 360];
-          const tracks = shakaInstance.getVariantTracks();
-          const heights = [...new Set(tracks.filter(t => t.type === 'video' && t.height).map(t => t.height))];
-          return heights.length ? heights.sort((a, b) => b - a) : [1080, 720, 480, 360];
-        };
-
+      function initPlyrControls(videoEl) {
+        if (plyrInstance) {
+          plyrInstance.destroy();
+        }
         plyrInstance = new Plyr(videoEl, {
           autoplay: true,
           controls: ['play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
-          settings: ['quality'],
-          quality: {
-            default: 720,
-            options: getQualityOptions(),
-            forced: true,
-            onChange: (newQuality) => {
-              if (!shakaInstance) return;
-              if (newQuality === 0) {
-                shakaInstance.configure({ abr: { enabled: true } });
-              } else {
-                shakaInstance.configure({ abr: { enabled: false } });
-                const tracks = shakaInstance.getVariantTracks();
-                const targetTrack = tracks.find(t => t.type === 'video' && t.height === newQuality);
-                if (targetTrack) {
-                  shakaInstance.selectVariantTrack(targetTrack, true);
-                }
-              }
-            }
-          }
+          settings: ['quality']
         });
-
-        if (shakaInstance) {
-          shakaInstance.addEventListener('trackschanged', () => {
-            const updatedHeights = getQualityOptions();
-            if (updatedHeights.length && plyrInstance) {
-              plyrInstance.quality.options = updatedHeights;
-            }
-          });
-        }
       }
 
       async function startStream() {
+        const videoEl = document.getElementById("player");
+        const iframeEl = document.getElementById("main-iframe");
+
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const requestedId = (urlParams.get("id") || "").trim();
 
           const response = await fetch(CONFIG.dataEndpoint, { cache: "no-store" });
-          if (!response.ok) throw new Error("Unable to fetch stream configuration.");
+          if (!response.ok) throw new Error("Unable to fetch channel data.");
           
           const data = await response.json();
           let targetData = Array.isArray(data) 
@@ -500,63 +470,81 @@
 
           if (!targetData) return;
 
+          // Update Channel Title and Logo
           document.getElementById("channelNameDisplay").textContent = targetData.name || "Live Stream";
           if (targetData.logo) {
             document.getElementById("dynamicLogo").src = targetData.logo;
           }
 
-          const videoEl = document.getElementById("player");
-          const iframeEl = document.getElementById("main-iframe");
-
+          // Case 1: Stream is an Iframe
           if (targetData.type === "iframe" || targetData.iframeSrc) {
+            if (shakaInstance) {
+              await shakaInstance.destroy();
+              shakaInstance = null;
+            }
             videoEl.style.display = "none";
             iframeEl.style.display = "block";
             iframeEl.src = targetData.iframeSrc;
-          } else if (targetData.streamUrl) {
-            iframeEl.style.display = "none";
-            videoEl.style.display = "block";
-
-            shaka.polyfill.installAll();
-            if (shaka.Player.isBrowserSupported()) {
-              shakaInstance = new shaka.Player(videoEl);
-              
-              if (targetData.drm && targetData.drm.clearKeys) {
-                shakaInstance.configure({ drm: { clearKeys: targetData.drm.clearKeys } });
-              }
-
-              await shakaInstance.load(targetData.streamUrl);
-              initPlyr(videoEl);
-            }
+            return;
           }
+
+          // Case 2: Stream is DASH (.mpd) or HLS (.m3u8)
+          iframeEl.style.display = "none";
+          iframeEl.src = "";
+          videoEl.style.display = "block";
+
+          shaka.polyfill.installAll();
+          if (!shaka.Player.isBrowserSupported()) {
+            alert("Browser does not support Shaka Player.");
+            return;
+          }
+
+          if (!shakaInstance) {
+            shakaInstance = new shaka.Player(videoEl);
+          }
+
+          // DRM Configuration if keys exist in JSON
+          if (targetData.drm && targetData.drm.clearKeys) {
+            shakaInstance.configure({
+              drm: { clearKeys: targetData.drm.clearKeys }
+            });
+          } else if (targetData.keyId && targetData.key) {
+            shakaInstance.configure({
+              drm: { clearKeys: { [targetData.keyId]: targetData.key } }
+            });
+          }
+
+          // Load stream into Shaka Player
+          await shakaInstance.load(targetData.streamUrl);
+          
+          // Initialize Plyr UI after Shaka loads
+          initPlyrControls(videoEl);
+          videoEl.play().catch(() => {});
+
         } catch (err) {
-          console.error("Initialization Error:", err);
+          console.error("Stream loading failed:", err);
         }
       }
 
       function initEvents() {
-        const shareHandler = () => {
-          if (navigator.share) {
-            navigator.share({ title: document.title, url: window.location.href }).catch(() => {});
-          } else {
-            navigator.clipboard.writeText(window.location.href);
-            alert("Link copied to clipboard!");
-          }
-        };
+        document.getElementById("btnShare").addEventListener("click", () => {
+          navigator.clipboard.writeText(window.location.href);
+          alert("Link copied!");
+        });
 
-        document.getElementById("btnShare").addEventListener("click", shareHandler);
         document.getElementById("btnCopy").addEventListener("click", () => {
           navigator.clipboard.writeText(window.location.href);
           alert("Link copied!");
         });
 
-        const openTg = () => {
+        const handleAuth = () => {
           window.open(CONFIG.telegramLink, "_blank");
           document.getElementById("tgPopup").classList.remove("visible");
           sessionStorage.setItem("helix_auth", "true");
           startStream();
         };
 
-        document.getElementById("tgJoinBtn").addEventListener("click", openTg);
+        document.getElementById("tgJoinBtn").addEventListener("click", handleAuth);
         document.getElementById("tgCloseBtn").addEventListener("click", () => {
           document.getElementById("tgPopup").classList.remove("visible");
           sessionStorage.setItem("helix_auth", "true");
@@ -573,5 +561,6 @@
 
       document.addEventListener("DOMContentLoaded", initEvents);
     </script>
+    
   </body>
 </html>
