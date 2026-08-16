@@ -318,24 +318,32 @@
 
         const data = await response.json();
 
-        if (data.streamUrl) {
+        let targetData = null;
+        if (Array.isArray(data)) {
+          targetData = data.find(item => item.id === requestedId) || data[0];
+        } else if (data.iframes) {
+          targetData = data.iframes.find(item => item.id === requestedId) || data.iframes[0];
+        } else if (data.streamUrl) {
           await loadShakaPlayer(data);
           return;
         }
 
-        if (data.iframes && data.iframes.length > 0) {
-          const targetData = data.iframes.find((item = {}) => item.id === requestedId) || data.iframes[0];
-
-          if (!targetData || !targetData.iframeSrc) {
-            throw new Error("No valid stream link found.");
-          }
-
-          if (targetData.hit) fetch(targetData.hit).catch(() => {});
-
-          loadIframe(targetData.iframeSrc);
-        } else {
-          showError("No streams currently live.");
+        if (!targetData) {
+          throw new Error("Channel ID not found.");
         }
+
+        if (targetData.type === "iframe" || targetData.iframeSrc) {
+          if (targetData.hit) fetch(targetData.hit).catch(() => {});
+          loadIframe(targetData.iframeSrc);
+          return;
+        }
+
+        if (targetData.streamUrl) {
+          await loadShakaPlayer(targetData);
+          return;
+        }
+
+        throw new Error("No valid stream or iframe source found.");
       } catch (err) {
         showError(err && err.message ? err.message : "Failed to load stream.");
       }
@@ -377,3 +385,4 @@
   </script>
 </body>
 </html>
+
