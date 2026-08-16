@@ -261,48 +261,10 @@
       }, 50);
     }
 
-    ;    async function startStream() {
+    async function loadShakaPlayer(streamData = {}) {
       hideError();
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const requestedId = (urlParams.get("id") || "").trim();
-
-        const response = await fetch(CONFIG.dataEndpoint, { cache: "no-store" });
-        if (!response.ok) throw new Error("Unable to fetch stream configuration.");
-
-        const data = await response.json();
-
-        // 1. Find the exact matching channel from the array or object
-        let targetData = null;
-        if (Array.isArray(data)) {
-          targetData = data.find(item => item.id === requestedId) || data[0];
-        } else if (data.iframes) {
-          targetData = data.iframes.find(item => item.id === requestedId) || data.iframes[0];
-        } else {
-          targetData = data;
-        }
-
-        if (!targetData) throw new Error("Channel ID not found.");
-
-        // 2. FORCE IFRAME ROUTING: If it contains an iframeSrc, load it immediately and STOP here!
-        if (targetData.iframeSrc || targetData.type === "iframe") {
-          if (targetData.hit) fetch(targetData.hit).catch(() => {});
-          loadIframe(targetData.iframeSrc);
-          return; // This stops Shaka Player from running completely!
-        }
-
-        // 3. Otherwise, only run Shaka if it's a raw stream URL
-        if (targetData.streamUrl) {
-          await loadShakaPlayer(targetData);
-          return;
-        }
-
-        throw new Error("No valid stream source found.");
-      } catch (err) {
-        showError(err && err.message ? err.message : "Failed to load stream.");
-      }
-    }
-    
+      DOM.iframe.style.display = "none";
+      DOM.video.style.display = "block";
 
       if (!window.shaka || !shaka.Player.isBrowserSupported()) {
         showError("Browser does not support live video player.");
@@ -361,16 +323,13 @@
           targetData = data.find(item => item.id === requestedId) || data[0];
         } else if (data.iframes) {
           targetData = data.iframes.find(item => item.id === requestedId) || data.iframes[0];
-        } else if (data.streamUrl) {
-          await loadShakaPlayer(data);
-          return;
+        } else {
+          targetData = data;
         }
 
-        if (!targetData) {
-          throw new Error("Channel ID not found.");
-        }
+        if (!targetData) throw new Error("Channel ID not found.");
 
-        if (targetData.type === "iframe" || targetData.iframeSrc) {
+        if (targetData.iframeSrc || targetData.type === "iframe") {
           if (targetData.hit) fetch(targetData.hit).catch(() => {});
           loadIframe(targetData.iframeSrc);
           return;
@@ -381,7 +340,7 @@
           return;
         }
 
-        throw new Error("No valid stream or iframe source found.");
+        throw new Error("No valid stream source found.");
       } catch (err) {
         showError(err && err.message ? err.message : "Failed to load stream.");
       }
@@ -423,4 +382,5 @@
   </script>
 </body>
 </html>
+
 
