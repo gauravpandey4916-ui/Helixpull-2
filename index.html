@@ -81,18 +81,18 @@
 
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
-      position: absolute; inset: 0; background: #000;
+      position: absolute; inset: 0; background: #000; z-index: 2;
     }
 
     .shaka-spinner-container, .shaka-buffering-spinner, .shaka-spinner { display: none !important; }
 
-    /* DEFAULT THUMBNAIL / LOADING OVERLAY */
+    /* THUMBNAIL / LOADING OVERLAY WITH POINTER-EVENTS NONE ON HIDDEN */
     .stream-poster {
       position: absolute; inset: 0; background: #08090d;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; z-index: 6; transition: opacity 0.3s ease;
+      gap: 12px; z-index: 6; transition: opacity 0.4s ease;
     }
-    .stream-poster.hidden { opacity: 0; pointer-events: none; }
+    .stream-poster.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
     
     .poster-spinner {
       width: 36px; height: 36px; border: 3px solid rgba(244,197,66,0.2);
@@ -320,6 +320,7 @@
     let player = null;
     let ui = null;
     let toastTimer = null;
+    let posterTimer = null;
 
     function showToast(msg = "", duration = 2600) {
       clearTimeout(toastTimer);
@@ -332,12 +333,16 @@
       if (DOM.streamPoster) {
         DOM.streamPoster.classList.add("hidden");
       }
+      if (posterTimer) clearTimeout(posterTimer);
     }
 
     function showPoster() {
       if (DOM.streamPoster) {
         DOM.streamPoster.classList.remove("hidden");
       }
+      // Safety fail-safe: Force hide overlay after 4s so it never blocks playback
+      if (posterTimer) clearTimeout(posterTimer);
+      posterTimer = setTimeout(hidePoster, 4000);
     }
 
     function showError(msg = "") {
@@ -358,11 +363,16 @@
       DOM.video.style.display = "none";
       DOM.iframe.style.display = "block";
       
+      DOM.iframe.onload = () => {
+        hidePoster();
+      };
+
       DOM.iframe.src = "about:blank";
       setTimeout(() => {
         DOM.iframe.src = url;
-        hidePoster();
         showToast("Stream Loaded");
+        // Hide overlay slightly after setting iframe source
+        setTimeout(hidePoster, 1200);
       }, 50);
     }
 
@@ -392,6 +402,8 @@
         });
 
         DOM.video.addEventListener("playing", hidePoster);
+        DOM.video.addEventListener("timeupdate", hidePoster);
+        DOM.video.addEventListener("loadeddata", hidePoster);
       }
 
       if (streamData.drm && streamData.drm.clearKeys) {
@@ -419,6 +431,7 @@
         await player.load(proxiedUrl);
         DOM.video.play().catch(() => {});
         showToast("Stream Playing");
+        setTimeout(hidePoster, 1500);
       } catch (err) {
         console.error("Shaka Load Error:", err);
         if (streamData.iframeSrc) {
@@ -458,7 +471,7 @@
 
         const rawUrl = targetData.streamUrl || targetData.link || targetData.m3u8 || targetData.mpd;
         
-        // 1. Check if direct video URL exists (.m3u8 or .mpd)
+        // Check if direct video URL exists (.m3u8 or .mpd)
         const isDirectStream = rawUrl && (rawUrl.includes(".m3u8") || rawUrl.includes(".mpd"));
 
         if (isDirectStream) {
@@ -487,25 +500,4 @@
     function initEvents() {
       DOM.retryBtn.addEventListener("click", startStream);
       if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
-      if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
-
-      const openTg = () => {
-        window.open(CONFIG.telegramLink, "_blank");
-        DOM.tgPopup.classList.remove("visible");
-        startStream();
-      };
-
-      DOM.tgJoinBtn1.addEventListener("click", openTg);
-      DOM.tgCloseBtn.addEventListener("click", () => {
-        DOM.tgPopup.classList.remove("visible");
-        startStream();
-      });
-
-      DOM.tgPopup.classList.add("visible");
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.shaka && typeof shaka.polyfill !== "undefined") {
-        shaka.polyfill.installAll();
-      }
-    
+      if (DOM.btnCopyLink) DOM.btnCopyLink.a
