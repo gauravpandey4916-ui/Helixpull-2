@@ -45,28 +45,29 @@
       overflow-x: hidden;
     }
 
-    .container { width: 100%; max-width: 820px; margin: 0 auto; padding: 28px 20px 12px; }
+    .container { width: 100%; max-width: 820px; margin: 0 auto; padding: 16px 20px 12px; }
 
+    /* REDUCED HEADER HEIGHT & PADDING */
     .header {
-      min-height: 136px; display: flex; align-items: center; justify-content: space-between;
-      gap: 20px; padding: 22px 26px; margin-bottom: 38px;
+      min-height: 64px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 18px; margin-bottom: 20px;
       background: linear-gradient(145deg, #0b0d13, #07080c);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 32px;
-      box-shadow: 0 12px 35px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
     }
 
-    .brand { display: flex; align-items: center; gap: 18px; min-width: 0; }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
     .brand-dot {
-      width: 20px; height: 20px; flex: 0 0 20px; border-radius: 50%;
-      background: var(--gold); box-shadow: 0 0 12px rgba(244,197,66,0.45);
+      width: 14px; height: 14px; flex: 0 0 14px; border-radius: 50%;
+      background: var(--gold); box-shadow: 0 0 10px rgba(244,197,66,0.45);
     }
-    .brand-name { font-size: clamp(26px, 5vw, 38px); font-weight: 850; letter-spacing: -1.2px; }
+    .brand-name { font-size: clamp(18px, 4vw, 24px); font-weight: 850; letter-spacing: -0.5px; }
 
     .join-header {
-      min-width: 142px; padding: 17px 30px;
+      min-width: 90px; padding: 8px 18px;
       background: linear-gradient(135deg, var(--gold-bright), #e7ad18);
-      color: #080808; border: none; border-radius: 24px;
-      font-size: 19px; font-weight: 800; cursor: pointer;
+      color: #080808; border: none; border-radius: 14px;
+      font-size: 14px; font-weight: 800; cursor: pointer;
       text-decoration: none; text-align: center; transition: var(--transition);
     }
 
@@ -85,8 +86,27 @@
 
     .shaka-spinner-container, .shaka-buffering-spinner, .shaka-spinner { display: none !important; }
 
+    /* DEFAULT THUMBNAIL / LOADING OVERLAY */
+    .stream-poster {
+      position: absolute; inset: 0; background: #08090d;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; z-index: 6; transition: opacity 0.3s ease;
+    }
+    .stream-poster.hidden { opacity: 0; pointer-events: none; }
+    
+    .poster-spinner {
+      width: 36px; height: 36px; border: 3px solid rgba(244,197,66,0.2);
+      border-top-color: var(--gold); border-radius: 50%;
+      animation: posterSpin 0.8s linear infinite;
+    }
+    .poster-text { font-size: 14px; font-weight: 650; color: var(--muted); letter-spacing: 0.5px; }
+
+    @keyframes posterSpin {
+      to { transform: rotate(360deg); }
+    }
+
     .player-brand {
-      position: absolute; top: 20px; left: 20px; z-index: 5;
+      position: absolute; top: 20px; left: 20px; z-index: 7;
       padding: 9px 18px; background: rgba(0,0,0,0.72);
       border: 1px solid rgba(244,197,66,0.24); border-radius: 12px;
       color: var(--gold); font-size: 15px; font-weight: 750; pointer-events: none;
@@ -190,10 +210,10 @@
     .popup-btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
 
     @media (max-width: 650px) {
-      .container { padding: 18px 14px 8px; }
-      .header { min-height: 112px; padding: 18px; border-radius: 27px; margin-bottom: 26px; }
-      .brand-name { font-size: 28px; }
-      .join-header { min-width: 105px; padding: 14px 20px; border-radius: 20px; font-size: 17px; }
+      .container { padding: 12px 14px 8px; }
+      .header { min-height: 54px; padding: 8px 14px; border-radius: 16px; margin-bottom: 16px; }
+      .brand-name { font-size: 20px; }
+      .join-header { min-width: 75px; padding: 6px 14px; border-radius: 12px; font-size: 13px; }
       .channel-card { padding: 22px 18px; gap: 16px; border-radius: 25px; flex-wrap: wrap; margin-bottom: 26px; }
       .live-badge { width: 100%; }
       .community-card { padding: 27px 20px; }
@@ -218,6 +238,13 @@
     <div class="player-panel">
       <div class="player-wrapper" data-shaka-player-container id="playerContainer">
         <div class="player-brand">@Helixpull</div>
+        
+        <!-- INITIALIZING THUMBNAIL / SPINNER -->
+        <div id="streamPoster" class="stream-poster">
+          <div class="poster-spinner"></div>
+          <div class="poster-text">Initializing Stream...</div>
+        </div>
+
         <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
         <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
@@ -278,6 +305,7 @@
       video: document.getElementById("video"),
       iframe: document.getElementById("main-iframe"),
       playerContainer: document.getElementById("playerContainer"),
+      streamPoster: document.getElementById("streamPoster"),
       errorOverlay: document.getElementById("errorOverlay"),
       errorMsg: document.getElementById("errorMsg"),
       retryBtn: document.getElementById("retryBtn"),
@@ -300,7 +328,20 @@
       toastTimer = setTimeout(() => DOM.toast.classList.remove("show"), duration);
     }
 
+    function hidePoster() {
+      if (DOM.streamPoster) {
+        DOM.streamPoster.classList.add("hidden");
+      }
+    }
+
+    function showPoster() {
+      if (DOM.streamPoster) {
+        DOM.streamPoster.classList.remove("hidden");
+      }
+    }
+
     function showError(msg = "") {
+      hidePoster();
       DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
       DOM.errorOverlay.classList.add("visible");
       DOM.video.style.display = "none";
@@ -320,6 +361,7 @@
       DOM.iframe.src = "about:blank";
       setTimeout(() => {
         DOM.iframe.src = url;
+        hidePoster();
         showToast("Stream Loaded");
       }, 50);
     }
@@ -341,7 +383,6 @@
         ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
         player = ui.getControls().getPlayer();
         player.addEventListener("error", () => {
-          // If Shaka fails, automatically fallback to iframe if available
           if (streamData.iframeSrc) {
             console.warn("Shaka failed. Auto-switching to iframe fallback...");
             loadIframe(streamData.iframeSrc);
@@ -349,6 +390,8 @@
             showError("Stream error. Verify source link.");
           }
         });
+
+        DOM.video.addEventListener("playing", hidePoster);
       }
 
       if (streamData.drm && streamData.drm.clearKeys) {
@@ -390,6 +433,7 @@
     // Router Logic: Validates whether payload is a direct stream or iframe URL
     async function startStream() {
       hideError();
+      showPoster();
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const requestedId = (urlParams.get("id") || "").trim();
@@ -418,10 +462,8 @@
         const isDirectStream = rawUrl && (rawUrl.includes(".m3u8") || rawUrl.includes(".mpd"));
 
         if (isDirectStream) {
-          // Route to Shaka Player
           await loadShakaPlayer(targetData, rawUrl);
         } else if (targetData.iframeSrc || targetData.type === "iframe" || (rawUrl && rawUrl.includes("http"))) {
-          // Route to Iframe Fallback Container
           loadIframe(targetData.iframeSrc || rawUrl);
         } else {
           throw new Error("No valid stream source or iframe URL found.");
@@ -466,11 +508,4 @@
       if (window.shaka && typeof shaka.polyfill !== "undefined") {
         shaka.polyfill.installAll();
       }
-      initEvents();
-    });
-  </script>
-</body>
-</html>
-
-
-
+    
