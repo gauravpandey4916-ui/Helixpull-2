@@ -78,9 +78,8 @@
 
     .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
 
-    /* Single Shaka Player element - Visible by default */
-    .video-player {
-      width: 100%; height: 100%; border: none; display: block;
+    .video-player, #main-iframe {
+      width: 100%; height: 100%; border: none; display: none;
       position: absolute; inset: 0; background: #000;
     }
 
@@ -219,8 +218,8 @@
     <div class="player-panel">
       <div class="player-wrapper" data-shaka-player-container id="playerContainer">
         <div class="player-brand">@Helixpull</div>
-        <!-- Only Shaka Player element present -->
         <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
+        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
         <div id="errorOverlay" class="error-overlay">
           <p id="errorMsg" class="error-message">Loading Stream...</p>
@@ -277,6 +276,7 @@
 
     const DOM = {
       video: document.getElementById("video"),
+      iframe: document.getElementById("main-iframe"),
       playerContainer: document.getElementById("playerContainer"),
       errorOverlay: document.getElementById("errorOverlay"),
       errorMsg: document.getElementById("errorMsg"),
@@ -304,34 +304,57 @@
       DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
       DOM.errorOverlay.classList.add("visible");
       DOM.video.style.display = "none";
+      DOM.iframe.style.display = "none";
     }
 
     function hideError() {
       DOM.errorOverlay.classList.remove("visible");
-      DOM.video.style.display = "block";
     }
 
-    async function loadShakaPlayer(streamData = {}) {
+    // Fallback 1: Iframe embed mode for protected Cloudflare/Web sources
+    function loadIframe(url) {
       hideError();
+      DOM.video.style.display = "none";
+      DOM.iframe.style.display = "block";
+      
+      DOM.iframe.src = "about:blank";
+      setTimeout(() => {
+        DOM.iframe.src = url;
+        showToast("Stream Loaded");
+      }, 50);
+    }
+
+    // Primary: Native Shaka Player mode for direct stream files (.m3u8 / .mpd)
+    async function loadShakaPlayer(streamData = {}, rawUrl = "") {
+      hideError();
+      DOM.iframe.style.display = "none";
+      DOM.video.style.display = "block";
 
       if (!window.shaka || !shaka.Player.isBrowserSupported()) {
-        showError("Browser does not support live video player.");
+        console.warn("Shaka not supported. Falling back to iframe...");
+        if (streamData.iframeSrc) return loadIframe(streamData.iframeSrc);
+        showError("Browser does not support video player.");
         return;
       }
 
-      // Instantiate Shaka Player overlay once
       if (!ui) {
         ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
         player = ui.getControls().getPlayer();
-        player.addEventListener("error", () => showError("Stream Error. Retry."));
+        player.addEventListener("error", () => {
+          // If Shaka fails, automatically fallback to iframe if available
+          if (streamData.iframeSrc) {
+            console.warn("Shaka failed. Auto-switching to iframe fallback...");
+            loadIframe(streamData.iframeSrc);
+          } else {
+            showError("Stream error. Verify source link.");
+          }
+        });
       }
 
-      // Configure DRM Keys if present
       if (streamData.drm && streamData.drm.clearKeys) {
         player.configure({ drm: { clearKeys: streamData.drm.clearKeys } });
       }
 
-      // Configure Cookie/Token Headers if present
       player.getNetworkingEngine().clearAllRequestFilters();
       player.getNetworkingEngine().registerRequestFilter((type, request) => {
         if (streamData.cookie) {
@@ -349,22 +372,22 @@
       });
 
       try {
-        // Automatically picks streamUrl or link from payload
-        const rawUrl = streamData.streamUrl || streamData.link || streamData.iframeSrc;
-        if (!rawUrl) throw new Error("No video stream found.");
-
         const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(rawUrl);
         await player.load(proxiedUrl);
-        
-        // Auto-play stream on successful load
         DOM.video.play().catch(() => {});
         showToast("Stream Playing");
       } catch (err) {
-        console.error(err);
-        showError("Playback error. Failed to load stream inside Shaka Player.");
+        console.error("Shaka Load Error:", err);
+        if (streamData.iframeSrc) {
+          console.warn("Direct stream failed. Switching to iframe fallback...");
+          loadIframe(streamData.iframeSrc);
+        } else {
+          showError("Playback error. Failed to load stream.");
+        }
       }
     }
 
+    // Router Logic: Validates whether payload is a direct stream or iframe URL
     async function startStream() {
       hideError();
       try {
@@ -389,8 +412,20 @@
 
         if (targetData.hit) fetch(targetData.hit).catch(() => {});
 
-        // Pass directly to Shaka Player — iframe code bypasses completely
-        await loadShakaPlayer(targetData);
+        const rawUrl = targetData.streamUrl || targetData.link || targetData.m3u8 || targetData.mpd;
+        
+        // 1. Check if direct video URL exists (.m3u8 or .mpd)
+        const isDirectStream = rawUrl && (rawUrl.includes(".m3u8") || rawUrl.includes(".mpd"));
+
+        if (isDirectStream) {
+          // Route to Shaka Player
+          await loadShakaPlayer(targetData, rawUrl);
+        } else if (targetData.iframeSrc || targetData.type === "iframe" || (rawUrl && rawUrl.includes("http"))) {
+          // Route to Iframe Fallback Container
+          loadIframe(targetData.iframeSrc || rawUrl);
+        } else {
+          throw new Error("No valid stream source or iframe URL found.");
+        }
       } catch (err) {
         showError(err && err.message ? err.message : "Failed to load stream.");
       }
@@ -436,4 +471,6 @@
   </script>
 </body>
 </html>
+
+
 
