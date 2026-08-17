@@ -16,7 +16,7 @@
     gtag('config', 'G-SMZXC121E6');
   </script>
 
-  <!-- Original Working Shaka Player CDN -->
+  <!-- Shaka Player CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css" crossorigin="anonymous" />
   <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.min.js" crossorigin="anonymous"></script>
 
@@ -78,8 +78,9 @@
 
     .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
 
-    .video-player, #main-iframe {
-      width: 100%; height: 100%; border: none; display: none;
+    /* Single Shaka Player element - Visible by default */
+    .video-player {
+      width: 100%; height: 100%; border: none; display: block;
       position: absolute; inset: 0; background: #000;
     }
 
@@ -218,8 +219,8 @@
     <div class="player-panel">
       <div class="player-wrapper" data-shaka-player-container id="playerContainer">
         <div class="player-brand">@Helixpull</div>
+        <!-- Only Shaka Player element present -->
         <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
-        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
         <div id="errorOverlay" class="error-overlay">
           <p id="errorMsg" class="error-message">Loading Stream...</p>
@@ -276,7 +277,6 @@
 
     const DOM = {
       video: document.getElementById("video"),
-      iframe: document.getElementById("main-iframe"),
       playerContainer: document.getElementById("playerContainer"),
       errorOverlay: document.getElementById("errorOverlay"),
       errorMsg: document.getElementById("errorMsg"),
@@ -304,45 +304,34 @@
       DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
       DOM.errorOverlay.classList.add("visible");
       DOM.video.style.display = "none";
-      DOM.iframe.style.display = "none";
     }
 
     function hideError() {
       DOM.errorOverlay.classList.remove("visible");
-    }
-
-    function loadIframe(url) {
-      hideError();
-      DOM.video.style.display = "none";
-      DOM.iframe.style.display = "block";
-      
-      DOM.iframe.src = "about:blank";
-      setTimeout(() => {
-        DOM.iframe.src = url;
-        showToast("Stream Loaded");
-      }, 50);
+      DOM.video.style.display = "block";
     }
 
     async function loadShakaPlayer(streamData = {}) {
       hideError();
-      DOM.iframe.style.display = "none";
-      DOM.video.style.display = "block";
 
       if (!window.shaka || !shaka.Player.isBrowserSupported()) {
         showError("Browser does not support live video player.");
         return;
       }
 
+      // Instantiate Shaka Player overlay once
       if (!ui) {
         ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
         player = ui.getControls().getPlayer();
         player.addEventListener("error", () => showError("Stream Error. Retry."));
       }
 
+      // Configure DRM Keys if present
       if (streamData.drm && streamData.drm.clearKeys) {
         player.configure({ drm: { clearKeys: streamData.drm.clearKeys } });
       }
 
+      // Configure Cookie/Token Headers if present
       player.getNetworkingEngine().clearAllRequestFilters();
       player.getNetworkingEngine().registerRequestFilter((type, request) => {
         if (streamData.cookie) {
@@ -360,12 +349,19 @@
       });
 
       try {
-        const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(streamData.streamUrl);
+        // Automatically picks streamUrl or link from payload
+        const rawUrl = streamData.streamUrl || streamData.link || streamData.iframeSrc;
+        if (!rawUrl) throw new Error("No video stream found.");
+
+        const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(rawUrl);
         await player.load(proxiedUrl);
+        
+        // Auto-play stream on successful load
+        DOM.video.play().catch(() => {});
         showToast("Stream Playing");
       } catch (err) {
         console.error(err);
-        showError("Playback error. Network restricted.");
+        showError("Playback error. Failed to load stream inside Shaka Player.");
       }
     }
 
@@ -391,18 +387,10 @@
 
         if (!targetData) throw new Error("Channel ID not found.");
 
-        if (targetData.iframeSrc || targetData.type === "iframe") {
-          if (targetData.hit) fetch(targetData.hit).catch(() => {});
-          loadIframe(targetData.iframeSrc);
-          return;
-        }
+        if (targetData.hit) fetch(targetData.hit).catch(() => {});
 
-        if (targetData.streamUrl) {
-          await loadShakaPlayer(targetData);
-          return;
-        }
-
-        throw new Error("No valid stream source found.");
+        // Pass directly to Shaka Player — iframe code bypasses completely
+        await loadShakaPlayer(targetData);
       } catch (err) {
         showError(err && err.message ? err.message : "Failed to load stream.");
       }
@@ -448,3 +436,4 @@
   </script>
 </body>
 </html>
+
