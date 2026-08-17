@@ -172,40 +172,24 @@
     }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* POPUP OVERLAY & SCORE CARD */
     .popup-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: none;
       align-items: center; justify-content: center; z-index: 1000; padding: 20px;
-      backdrop-filter: blur(5px);
     }
     .popup-overlay.visible { display: flex; }
 
     .popup-card {
       background: linear-gradient(145deg, #101219, #08090d); border-radius: 24px;
-      padding: 24px 20px; text-align: center; max-width: 400px; width: 100%;
-      border: 1px solid rgba(244,197,66,0.25);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      padding: 30px; text-align: center; max-width: 380px; width: 100%;
+      border: 1px solid rgba(244,197,66,0.2);
     }
 
-    .popup-title { font-size: 22px; font-weight: 850; margin-bottom: 14px; }
-
-    .score-card {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(244, 197, 66, 0.2);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 16px;
-      text-align: center;
-    }
-    .score-match-name { font-size: 14px; font-weight: 750; color: #ffffff; margin-bottom: 4px; }
-    .score-details { font-size: 15px; font-weight: 800; color: var(--gold-bright); margin-bottom: 4px; }
-    .score-status { font-size: 12px; color: #28a745; font-weight: 650; }
-
+    .popup-title { font-size: 24px; font-weight: 850; margin-bottom: 20px; }
     .popup-btn {
       display: block; width: 100%; padding: 14px; border: none; border-radius: 13px;
       font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 10px; text-decoration: none;
     }
-    .popup-btn-primary { background: linear-gradient(135deg, var(--gold-bright), #e4ae1c); color: #080808; }
+    .popup-btn-primary { background: #000; color: #ff0000; }
     .popup-btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
 
     @media (max-width: 650px) {
@@ -276,16 +260,10 @@
 
   <div id="toast" class="toast"></div>
 
-  <!-- Telegram Popup with Score Section -->
+  <!-- Telegram Popup -->
   <div id="tgPopup" class="popup-overlay">
     <div class="popup-card">
       <div class="popup-title">Join helixpull</div>
-      
-      <!-- Match Score Feature -->
-      <div class="score-card" id="popupScoreContainer">
-        <div class="score-match-name">Loading match score...</div>
-      </div>
-
       <button class="popup-btn popup-btn-primary" id="tgJoinBtn1">Join Telegram</button>
       <button class="popup-btn popup-btn-secondary" id="tgCloseBtn">Already Joined</button>
     </div>
@@ -296,8 +274,7 @@
 
     const CONFIG = {
       telegramLink: "https://telegram.me/helixpull",
-      dataEndpoint: "https://helixpull-cricket.gauravpandey4916.workers.dev/",
-      scoreApiUrl: "https://api.cricapi.com/v1/currentMatches?apikey=58ad5b80-5953-4c2f-926d-11148c418ad8&offset=0"
+      dataEndpoint: "https://helixpull-cricket.gauravpandey4916.workers.dev/"
     };
 
     const DOM = {
@@ -312,14 +289,12 @@
       btnShare: document.getElementById("btnShare"),
       btnCopyLink: document.getElementById("btnCopyLink"),
       tgJoinBtn1: document.getElementById("tgJoinBtn1"),
-      tgCloseBtn: document.getElementById("tgCloseBtn"),
-      popupScoreContainer: document.getElementById("popupScoreContainer")
+      tgCloseBtn: document.getElementById("tgCloseBtn")
     };
 
     let player = null;
     let ui = null;
     let toastTimer = null;
-    let scoreInterval = null;
 
     function showToast(msg = "", duration = 2600) {
       clearTimeout(toastTimer);
@@ -337,35 +312,6 @@
 
     function hideError() {
       DOM.errorOverlay.classList.remove("visible");
-    }
-
-    // Fetch live score for popup
-    async function fetchLiveScore() {
-      try {
-        const response = await fetch(CONFIG.scoreApiUrl);
-        const result = await response.json();
-
-        if (result.status !== "success" || !result.data || result.data.length === 0) {
-          DOM.popupScoreContainer.innerHTML = `<div class="score-match-name" style="color:var(--muted)">No live matches right now</div>`;
-          return;
-        }
-
-        const currentMatch = result.data[0];
-        let scoreText = "Score updates pending...";
-
-        if (currentMatch.score && currentMatch.score.length > 0) {
-          scoreText = currentMatch.score.map(s => `${s.inning}: ${s.r}/${s.w} (${s.o} ov)`).join(" | ");
-        }
-
-        DOM.popupScoreContainer.innerHTML = `
-          <div class="score-match-name">${currentMatch.name}</div>
-          <div class="score-details">${scoreText}</div>
-          <div class="score-status">● ${currentMatch.status}</div>
-        `;
-      } catch (err) {
-        console.error("Score fetch error:", err);
-        DOM.popupScoreContainer.innerHTML = `<div class="score-match-name" style="color:var(--muted)">Live score unavailable</div>`;
-      }
     }
 
     // Fallback 1: Iframe embed mode for protected Cloudflare/Web sources
@@ -490,4 +436,38 @@
         try { 
           await navigator.share({ title: document.title, url: window.location.href }); 
           return; 
-        } catch 
+        } catch {}
+      }
+      navigator.clipboard.writeText(window.location.href);
+      showToast("Link copied!");
+    }
+
+    function initEvents() {
+      DOM.retryBtn.addEventListener("click", startStream);
+      if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
+      if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
+
+      const openTg = () => {
+        window.open(CONFIG.telegramLink, "_blank");
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      };
+
+      DOM.tgJoinBtn1.addEventListener("click", openTg);
+      DOM.tgCloseBtn.addEventListener("click", () => {
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      });
+
+      DOM.tgPopup.classList.add("visible");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.shaka && typeof shaka.polyfill !== "undefined") {
+        shaka.polyfill.installAll();
+      }
+      initEvents();
+    });
+  </script>
+</body>
+</html>
