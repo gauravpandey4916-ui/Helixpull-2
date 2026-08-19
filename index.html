@@ -16,9 +16,8 @@
     gtag('config', 'G-SMZXC121E6');
   </script>
 
-  <!-- Shaka Player CDN -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css" crossorigin="anonymous" />
-  <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.min.js" crossorigin="anonymous"></script>
+  <!-- Compiled Shaka Engine without UI Controls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js" crossorigin="anonymous"></script>
 
   <style>
     :root {
@@ -45,10 +44,8 @@
       overflow-x: hidden;
     }
 
-    /* EXPANDED CONTAINER WIDTH */
     .container { width: 100%; max-width: 900px; margin: 0 auto; padding: 14px 16px 12px; }
 
-    /* COMPACT HEADER BANNER */
     .header {
       min-height: 52px; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 8px 16px; margin-bottom: 16px;
@@ -72,7 +69,6 @@
       text-decoration: none; text-align: center; transition: var(--transition);
     }
 
-    /* ENLARGED PLAYER CONTAINER */
     .player-panel {
       position: relative; background: #000;
       border: 1px solid rgba(255,255,255,0.11); border-radius: 24px;
@@ -84,9 +80,8 @@
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
       position: absolute; inset: 0; background: #000; z-index: 1;
+      object-fit: contain;
     }
-
-    .shaka-spinner-container, .shaka-buffering-spinner, .shaka-spinner { display: none !important; }
 
     .player-brand {
       position: absolute; top: 16px; left: 16px; z-index: 5;
@@ -219,9 +214,9 @@
     </div>
 
     <div class="player-panel">
-      <div class="player-wrapper" data-shaka-player-container id="playerContainer">
+      <div class="player-wrapper" id="playerContainer">
         <div class="player-brand">@Helixpull</div>
-        <video id="video" class="video-player" data-shaka-player autoplay playsinline controlslist="nodownload noremoteplayback" oncontextmenu="return false"></video>
+        <video id="video" class="video-player" autoplay playsinline controls></video>
         <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
         <div id="errorOverlay" class="error-overlay">
@@ -293,7 +288,6 @@
     };
 
     let player = null;
-    let ui = null;
     let toastTimer = null;
 
     function showToast(msg = "", duration = 2600) {
@@ -314,7 +308,6 @@
       DOM.errorOverlay.classList.remove("visible");
     }
 
-    // Fallback 1: Iframe embed mode for protected Cloudflare/Web sources
     function loadIframe(url) {
       hideError();
       DOM.video.style.display = "none";
@@ -327,25 +320,22 @@
       }, 50);
     }
 
-    // Primary: Native Shaka Player mode for direct stream files (.m3u8 / .mpd)
     async function loadShakaPlayer(streamData = {}, rawUrl = "") {
       hideError();
       DOM.iframe.style.display = "none";
       DOM.video.style.display = "block";
 
       if (!window.shaka || !shaka.Player.isBrowserSupported()) {
-        console.warn("Shaka not supported. Falling back to iframe...");
         if (streamData.iframeSrc) return loadIframe(streamData.iframeSrc);
         showError("Browser does not support video player.");
         return;
       }
 
-      if (!ui) {
-        ui = new shaka.ui.Overlay(new shaka.Player(DOM.video), DOM.playerContainer, DOM.video);
-        player = ui.getControls().getPlayer();
+      if (!player) {
+        // Direct player setup without UI overlay library
+        player = new shaka.Player(DOM.video);
         player.addEventListener("error", () => {
           if (streamData.iframeSrc) {
-            console.warn("Shaka failed. Auto-switching to iframe fallback...");
             loadIframe(streamData.iframeSrc);
           } else {
             showError("Stream error. Verify source link.");
@@ -379,9 +369,7 @@
         DOM.video.play().catch(() => {});
         showToast("Stream Playing");
       } catch (err) {
-        console.error("Shaka Load Error:", err);
         if (streamData.iframeSrc) {
-          console.warn("Direct stream failed. Switching to iframe fallback...");
           loadIframe(streamData.iframeSrc);
         } else {
           showError("Playback error. Failed to load stream.");
@@ -389,7 +377,6 @@
       }
     }
 
-    // Router Logic: Validates whether payload is a direct stream or iframe URL
     async function startStream() {
       hideError();
       try {
@@ -415,8 +402,6 @@
         if (targetData.hit) fetch(targetData.hit).catch(() => {});
 
         const rawUrl = targetData.streamUrl || targetData.link || targetData.m3u8 || targetData.mpd;
-        
-        // Check if direct video URL exists (.m3u8 or .mpd)
         const isDirectStream = rawUrl && (rawUrl.includes(".m3u8") || rawUrl.includes(".mpd"));
 
         if (isDirectStream) {
@@ -446,6 +431,17 @@
       DOM.retryBtn.addEventListener("click", startStream);
       if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
       if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
+
+      // Programmatic un-mute on initial tap
+      const enableAudio = () => {
+        if (DOM.video) {
+          DOM.video.muted = false;
+        }
+        document.removeEventListener("click", enableAudio);
+        document.removeEventListener("touchstart", enableAudio);
+      };
+      document.addEventListener("click", enableAudio);
+      document.addEventListener("touchstart", enableAudio);
 
       const openTg = () => {
         window.open(CONFIG.telegramLink, "_blank");
