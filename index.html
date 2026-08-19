@@ -78,8 +78,6 @@
     }
 
     .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
-    .player-wrapper:-webkit-full-screen { width: 100vw; height: 100vh; }
-    .player-wrapper:fullscreen { width: 100vw; height: 100vh; }
 
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
@@ -95,17 +93,7 @@
       display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
     }
 
-    /* Floating Custom Fullscreen Overlay Button */
-    .custom-fs-btn {
-      position: absolute; bottom: 14px; right: 14px; z-index: 10;
-      width: 38px; height: 38px; border-radius: 10px;
-      background: rgba(0,0,0,0.75); border: 1px solid rgba(255,255,255,0.2);
-      color: #fff; display: flex; align-items: center; justify-content: center;
-      cursor: pointer; transition: var(--transition);
-    }
-    .custom-fs-btn:active { transform: scale(0.92); }
-    .custom-fs-btn svg { width: 20px; height: 20px; fill: #ffffff; }
-
+    /* Player Overlay Dot: Static Red default */
     .watermark-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--red);
@@ -113,6 +101,7 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
+    /* Active State: Blinking Green */
     .watermark-dot.is-live {
       background: var(--green);
       box-shadow: 0 0 8px rgba(16,185,129,0.8);
@@ -157,7 +146,8 @@
       background: rgba(16,185,129,0.06);
       color: var(--green);
     }
-
+    
+    /* Channel Card Live Dot: Static Red default */
     .live-dot { 
       width: 9px; height: 9px; border-radius: 50%; 
       background: var(--red); 
@@ -165,6 +155,7 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
+    /* Active State: Blinking Green */
     .live-dot.is-live {
       background: var(--green); 
       box-shadow: 0 0 8px rgba(16,185,129,0.6);
@@ -189,7 +180,7 @@
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
       text-decoration: none; transition: var(--transition);
     }
-
+    
     .action-btn-gold {
       background: linear-gradient(135deg, var(--gold-bright), #e4ae1c);
       color: #080808;
@@ -270,14 +261,8 @@
     <div class="player-panel">
       <div class="player-wrapper" id="playerContainer">
         <div class="player-brand"><span class="watermark-dot" id="watermarkDot"></span> LIVE</div>
-        
-        <!-- Custom Overlay Fullscreen Button -->
-        <button class="custom-fs-btn" id="customFsBtn" title="Toggle Fullscreen">
-          <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-        </button>
-
         <video id="video" class="video-player" autoplay playsinline controls></video>
-        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" referrerpolicy="no-referrer"></iframe>
+        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
         <div id="errorOverlay" class="error-overlay">
           <p id="errorMsg" class="error-message">Loading Stream...</p>
@@ -331,7 +316,6 @@
       video: document.getElementById("video"),
       iframe: document.getElementById("main-iframe"),
       playerContainer: document.getElementById("playerContainer"),
-      customFsBtn: document.getElementById("customFsBtn"),
       errorOverlay: document.getElementById("errorOverlay"),
       errorMsg: document.getElementById("errorMsg"),
       retryBtn: document.getElementById("retryBtn"),
@@ -358,35 +342,6 @@
         DOM.watermarkDot.classList.remove("is-live");
         DOM.liveDot.classList.remove("is-live");
         DOM.liveBadge.classList.remove("is-live");
-      }
-    }
-
-    // Handles Fullscreen Toggle and Landscape Screen Lock
-    async function toggleContainerFullscreen() {
-      const container = DOM.playerContainer;
-
-      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        if (container.requestFullscreen) {
-          await container.requestFullscreen();
-        } else if (container.webkitRequestFullscreen) {
-          await container.webkitRequestFullscreen();
-        }
-
-        // Force orientation to Landscape on compatible browsers
-        if (screen.orientation && screen.orientation.lock) {
-          screen.orientation.lock("landscape").catch(() => {});
-        }
-      } else {
-        if (document.exitFullscreen) {
-          await document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-          await document.webkitExitFullscreen();
-        }
-
-        // Release orientation lock when exiting
-        if (screen.orientation && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
       }
     }
 
@@ -534,4 +489,46 @@
 
     function initEvents() {
       DOM.retryBtn.addEventListener("click", startStream);
-      if (DOM.customFsBtn) DOM.customFsBtn.ad
+      if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
+      if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
+
+      // Turn live dots green once the video actually starts playing
+      DOM.video.addEventListener("playing", () => {
+        setLiveStatus(true);
+      });
+
+      const enableAudio = () => {
+        if (DOM.video) {
+          DOM.video.muted = false;
+        }
+        document.removeEventListener("click", enableAudio);
+        document.removeEventListener("touchstart", enableAudio);
+      };
+      document.addEventListener("click", enableAudio);
+      document.addEventListener("touchstart", enableAudio);
+
+      const openTg = () => {
+        window.open(CONFIG.telegramLink, "_blank");
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      };
+
+      DOM.tgJoinBtn1.addEventListener("click", openTg);
+      DOM.tgCloseBtn.addEventListener("click", () => {
+        DOM.tgPopup.classList.remove("visible");
+        startStream();
+      });
+
+      DOM.tgPopup.classList.add("visible");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.shaka && typeof shaka.polyfill !== "undefined") {
+        shaka.polyfill.installAll();
+      }
+      initEvents();
+    });
+  </script>
+</body>
+  </html>
+  
