@@ -70,13 +70,14 @@
       text-decoration: none; text-align: center; transition: var(--transition);
     }
 
+    /* Adjusted player panel for larger video display area */
     .player-panel {
       position: relative; background: #000;
       border: 1px solid rgba(255,255,255,0.11); border-radius: 24px;
-      overflow: hidden; margin-bottom: 24px; box-shadow: 0 14px 40px rgba(0,0,0,0.5);
+      overflow: hidden; margin-bottom: 20px; box-shadow: 0 14px 40px rgba(0,0,0,0.5);
     }
 
-    .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
+    .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9.5; background: #000; }
 
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
@@ -84,7 +85,6 @@
       object-fit: contain;
     }
 
-    /* Updated Live Watermark on Player */
     .player-brand {
       position: absolute; top: 16px; left: 16px; z-index: 5;
       padding: 6px 12px; background: rgba(0,0,0,0.75);
@@ -115,9 +115,9 @@
     }
 
     .channel-card {
-      display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 22px 24px; margin-bottom: 24px;
+      display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 22px; margin-bottom: 20px;
       background: linear-gradient(145deg, #0b0d13, #080a0f);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 22px;
     }
 
     .channel-info { flex: 1; min-width: 0; }
@@ -144,16 +144,15 @@
       50% { opacity: 0.25; transform: scale(0.85); }
     }
 
-    /* Updated 3-Button Grid Layout */
     .action-grid { 
       display: grid; 
       grid-template-columns: repeat(3, 1fr); 
-      gap: 14px; 
-      margin-bottom: 28px; 
+      gap: 12px; 
+      margin-bottom: 24px; 
     }
 
     .action-btn {
-      min-height: 58px; border-radius: 18px; background: linear-gradient(145deg, #0b0d13, #080a0f);
+      min-height: 56px; border-radius: 16px; background: linear-gradient(145deg, #0b0d13, #080a0f);
       border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 16px; font-weight: 750;
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
       text-decoration: none; transition: var(--transition);
@@ -165,8 +164,23 @@
       border: none;
     }
 
-    .footer-credit { text-align: center; color: #8992a5; font-size: 14px; padding: 6px 10px 24px; }
-    .footer-credit span { color: var(--gold); font-weight: 750; }
+    /* Redesigned Footer matching the sample image style */
+    .footer-credit { 
+      text-align: center; 
+      color: #b0b8c8; 
+      font-size: 17px; 
+      font-weight: 500;
+      padding: 8px 10px 24px; 
+      line-height: 1.4;
+    }
+    .footer-top { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 4px; }
+    .footer-bottom { 
+      font-size: 20px; 
+      font-weight: 900; 
+      letter-spacing: 1px; 
+      color: #ffffff;
+      text-transform: uppercase;
+    }
 
     .toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
@@ -203,8 +217,10 @@
       .join-header { min-width: 65px; padding: 5px 12px; border-radius: 10px; font-size: 12px; }
       .channel-card { padding: 16px 14px; gap: 12px; border-radius: 18px; flex-wrap: wrap; margin-bottom: 16px; }
       .live-badge { width: 100%; }
-      .action-grid { gap: 8px; margin-bottom: 20px; }
+      .action-grid { gap: 8px; margin-bottom: 18px; }
       .action-btn { min-height: 52px; font-size: 14px; border-radius: 14px; }
+      .footer-credit { font-size: 15px; }
+      .footer-bottom { font-size: 18px; }
     }
   </style>
 </head>
@@ -222,7 +238,6 @@
 
     <div class="player-panel">
       <div class="player-wrapper" id="playerContainer">
-        <!-- Live watermark with blinking green dot -->
         <div class="player-brand"><span class="watermark-dot"></span> LIVE</div>
         <video id="video" class="video-player" autoplay playsinline controls></video>
         <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
@@ -242,7 +257,6 @@
       <div class="live-badge"><span class="live-dot"></span> LIVE STREAM</div>
     </div>
 
-    <!-- Cleaned 3-Button Grid -->
     <div class="action-grid">
       <button class="action-btn" id="btnShare"><span class="action-icon">⇧</span> Share</button>
       <button class="action-btn" id="btnCopyLink"><span class="action-icon">🔗</span> Copy</button>
@@ -251,8 +265,10 @@
       </a>
     </div>
 
+    <!-- Re-formatted footer layout -->
     <div class="footer-credit">
-      Made with ❤️ by <span>Gaurav</span> with Support of <span>helixpull</span>
+      <div class="footer-top">Made With ❤️ Made For You 🫶</div>
+      <div class="footer-bottom">© GAURAV × HELIXPULL</div>
     </div>
   </div>
 
