@@ -78,6 +78,8 @@
     }
 
     .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
+    .player-wrapper:-webkit-full-screen { width: 100vw; height: 100vh; }
+    .player-wrapper:fullscreen { width: 100vw; height: 100vh; }
 
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
@@ -93,7 +95,6 @@
       display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
     }
 
-    /* Player Overlay Dot: Static Red default */
     .watermark-dot {
       width: 8px; height: 8px; border-radius: 50%;
       background: var(--red);
@@ -101,7 +102,6 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* Active State: Blinking Green */
     .watermark-dot.is-live {
       background: var(--green);
       box-shadow: 0 0 8px rgba(16,185,129,0.8);
@@ -146,8 +146,7 @@
       background: rgba(16,185,129,0.06);
       color: var(--green);
     }
-    
-    /* Channel Card Live Dot: Static Red default */
+
     .live-dot { 
       width: 9px; height: 9px; border-radius: 50%; 
       background: var(--red); 
@@ -155,7 +154,6 @@
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
-    /* Active State: Blinking Green */
     .live-dot.is-live {
       background: var(--green); 
       box-shadow: 0 0 8px rgba(16,185,129,0.6);
@@ -180,7 +178,7 @@
       cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
       text-decoration: none; transition: var(--transition);
     }
-    
+
     .action-btn-gold {
       background: linear-gradient(135deg, var(--gold-bright), #e4ae1c);
       color: #080808;
@@ -242,7 +240,7 @@
       .action-grid { gap: 8px; margin-bottom: 18px; }
       .action-btn { min-height: 52px; font-size: 14px; border-radius: 14px; }
       .footer-credit { font-size: 15px; }
-      .footer-bottom { font-size: 18px; }
+      .footer-bottom { font-size: 14px; }
     }
   </style>
 </head>
@@ -253,7 +251,7 @@
     <div class="header">
       <div class="brand">
         <div class="brand-dot"></div>
-        <div class="brand-name">HELIXPULL</div>
+        <div class="brand-name">Helixpull Premium</div>
       </div>
       <a class="join-header" href="https://telegram.me/helixpull" target="_blank" rel="noopener noreferrer">Join</a>
     </div>
@@ -262,7 +260,8 @@
       <div class="player-wrapper" id="playerContainer">
         <div class="player-brand"><span class="watermark-dot" id="watermarkDot"></span> LIVE</div>
         <video id="video" class="video-player" autoplay playsinline controls></video>
-        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
+        <!-- Standard allow attribute restricting full screen inside iframe directly -->
+        <iframe id="main-iframe" allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" referrerpolicy="no-referrer"></iframe>
 
         <div id="errorOverlay" class="error-overlay">
           <p id="errorMsg" class="error-message">Loading Stream...</p>
@@ -283,7 +282,7 @@
       <button class="action-btn" id="btnShare"><span class="action-icon">⇧</span> Share</button>
       <button class="action-btn" id="btnCopyLink"><span class="action-icon">🔗</span> Copy</button>
       <a class="action-btn action-btn-gold" href="https://telegram.me/helixpull" target="_blank" rel="noopener noreferrer">
-        <span class="action-icon">➤</span> Join
+        <span class="action-icon">➤</span> Watch Other Matches
       </a>
     </div>
 
@@ -342,6 +341,23 @@
         DOM.watermarkDot.classList.remove("is-live");
         DOM.liveDot.classList.remove("is-live");
         DOM.liveBadge.classList.remove("is-live");
+      }
+    }
+
+    function toggleContainerFullscreen() {
+      const container = DOM.playerContainer;
+      if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        if (container.requestFullscreen) {
+          container.requestFullscreen();
+        } else if (container.webkitRequestFullscreen) {
+          container.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
       }
     }
 
@@ -492,7 +508,6 @@
       if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
       if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
 
-      // Turn live dots green once the video actually starts playing
       DOM.video.addEventListener("playing", () => {
         setLiveStatus(true);
       });
