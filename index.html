@@ -26,6 +26,7 @@
       --gold: #f4c542;
       --gold-bright: #ffd95a;
       --green: #10b981;
+      --red: #ef4444;
       --text: #ffffff;
       --muted: #9da6b8;
       --transition: all 0.22s ease;
@@ -76,10 +77,8 @@
       overflow: hidden; margin-bottom: 20px; box-shadow: 0 14px 40px rgba(0,0,0,0.5);
     }
 
-    /* Fixed 16:9 ratio to prevent black bars */
     .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
 
-    /* Set object-fit: cover to fill the player fully */
     .video-player, #main-iframe {
       width: 100%; height: 100%; border: none; display: none;
       position: absolute; inset: 0; background: #000; z-index: 1;
@@ -94,8 +93,16 @@
       display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
     }
 
+    /* Player Overlay Dot: Static Red default */
     .watermark-dot {
       width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Active State: Blinking Green */
+    .watermark-dot.is-live {
       background: var(--green);
       box-shadow: 0 0 8px rgba(16,185,129,0.8);
       animation: blink 1.5s infinite ease-in-out;
@@ -128,13 +135,28 @@
 
     .live-badge {
       min-width: 150px; padding: 10px 16px; border-radius: 14px;
-      border: 1px solid rgba(16,185,129,0.28); background: rgba(16,185,129,0.06);
-      color: var(--green); font-size: 15px; font-weight: 800;
+      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03);
+      color: var(--muted); font-size: 15px; font-weight: 800;
       display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .live-badge.is-live {
+      border-color: rgba(16,185,129,0.28);
+      background: rgba(16,185,129,0.06);
+      color: var(--green);
     }
     
+    /* Channel Card Live Dot: Static Red default */
     .live-dot { 
       width: 9px; height: 9px; border-radius: 50%; 
+      background: var(--red); 
+      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    /* Active State: Blinking Green */
+    .live-dot.is-live {
       background: var(--green); 
       box-shadow: 0 0 8px rgba(16,185,129,0.6);
       animation: blink 1.5s infinite ease-in-out; 
@@ -238,7 +260,7 @@
 
     <div class="player-panel">
       <div class="player-wrapper" id="playerContainer">
-        <div class="player-brand"><span class="watermark-dot"></span> LIVE</div>
+        <div class="player-brand"><span class="watermark-dot" id="watermarkDot"></span> LIVE</div>
         <video id="video" class="video-player" autoplay playsinline controls></video>
         <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
 
@@ -254,7 +276,7 @@
         <div class="channel-title">Sony Sports</div>
         <div class="channel-language">Language : <strong>Hindi</strong></div>
       </div>
-      <div class="live-badge"><span class="live-dot"></span> LIVE STREAM</div>
+      <div class="live-badge" id="liveBadge"><span class="live-dot" id="liveDot"></span> LIVE STREAM</div>
     </div>
 
     <div class="action-grid">
@@ -302,11 +324,26 @@
       btnShare: document.getElementById("btnShare"),
       btnCopyLink: document.getElementById("btnCopyLink"),
       tgJoinBtn1: document.getElementById("tgJoinBtn1"),
-      tgCloseBtn: document.getElementById("tgCloseBtn")
+      tgCloseBtn: document.getElementById("tgCloseBtn"),
+      watermarkDot: document.getElementById("watermarkDot"),
+      liveDot: document.getElementById("liveDot"),
+      liveBadge: document.getElementById("liveBadge")
     };
 
     let player = null;
     let toastTimer = null;
+
+    function setLiveStatus(active = false) {
+      if (active) {
+        DOM.watermarkDot.classList.add("is-live");
+        DOM.liveDot.classList.add("is-live");
+        DOM.liveBadge.classList.add("is-live");
+      } else {
+        DOM.watermarkDot.classList.remove("is-live");
+        DOM.liveDot.classList.remove("is-live");
+        DOM.liveBadge.classList.remove("is-live");
+      }
+    }
 
     function showToast(msg = "", duration = 2600) {
       clearTimeout(toastTimer);
@@ -316,6 +353,7 @@
     }
 
     function showError(msg = "") {
+      setLiveStatus(false);
       DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
       DOM.errorOverlay.classList.add("visible");
       DOM.video.style.display = "none";
@@ -328,6 +366,7 @@
 
     function loadIframe(url) {
       hideError();
+      setLiveStatus(false);
       DOM.video.style.display = "none";
       DOM.iframe.style.display = "block";
       
@@ -335,11 +374,13 @@
       setTimeout(() => {
         DOM.iframe.src = url;
         showToast("Stream Loaded");
+        setLiveStatus(true);
       }, 50);
     }
 
     async function loadShakaPlayer(streamData = {}, rawUrl = "") {
       hideError();
+      setLiveStatus(false);
       DOM.iframe.style.display = "none";
       DOM.video.style.display = "block";
 
@@ -385,6 +426,7 @@
         await player.load(proxiedUrl);
         DOM.video.play().catch(() => {});
         showToast("Stream Playing");
+        setLiveStatus(true);
       } catch (err) {
         if (streamData.iframeSrc) {
           loadIframe(streamData.iframeSrc);
@@ -396,6 +438,7 @@
 
     async function startStream() {
       hideError();
+      setLiveStatus(false);
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const requestedId = (urlParams.get("id") || "").trim();
@@ -448,6 +491,11 @@
       DOM.retryBtn.addEventListener("click", startStream);
       if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
       if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
+
+      // Turn live dots green once the video actually starts playing
+      DOM.video.addEventListener("playing", () => {
+        setLiveStatus(true);
+      });
 
       const enableAudio = () => {
         if (DOM.video) {
