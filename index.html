@@ -25,6 +25,7 @@
       --card: #090b11;
       --gold: #f4c542;
       --gold-bright: #ffd95a;
+      --green: #10b981;
       --text: #ffffff;
       --muted: #9da6b8;
       --transition: all 0.22s ease;
@@ -105,17 +106,9 @@
     }
 
     .channel-card {
-      display: flex; align-items: center; gap: 24px; padding: 24px; margin-bottom: 30px;
+      display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px; margin-bottom: 30px;
       background: linear-gradient(145deg, #0b0d13, #080a0f);
       border: 1px solid rgba(255,255,255,0.12); border-radius: 26px;
-    }
-
-    .channel-logo {
-      width: 100px; height: 100px; flex: 0 0 100px; border-radius: 22px;
-      background: linear-gradient(145deg, #11141b, #050609);
-      border: 1px solid rgba(244,197,66,0.25); display: flex;
-      align-items: center; justify-content: center; color: var(--gold);
-      font-size: 18px; font-weight: 850; text-align: center;
     }
 
     .channel-info { flex: 1; min-width: 0; }
@@ -125,11 +118,22 @@
 
     .live-badge {
       min-width: 160px; padding: 12px 18px; border-radius: 14px;
-      border: 1px solid rgba(244,197,66,0.27); background: rgba(244,197,66,0.045);
-      color: var(--gold); font-size: 16px; font-weight: 800;
+      border: 1px solid rgba(16,185,129,0.28); background: rgba(16,185,129,0.06);
+      color: var(--green); font-size: 16px; font-weight: 800;
       display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); }
+    
+    .live-dot { 
+      width: 9px; height: 9px; border-radius: 50%; 
+      background: var(--green); 
+      box-shadow: 0 0 8px rgba(16,185,129,0.6);
+      animation: blink 1.5s infinite ease-in-out; 
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.25; transform: scale(0.85); }
+    }
 
     .community-card {
       background: linear-gradient(145deg, #0b0d13, #080a0f);
@@ -227,7 +231,6 @@
     </div>
 
     <div class="channel-card">
-      <div class="channel-logo">HELIX<br />PULL</div>
       <div class="channel-info">
         <div class="channel-title">Sony Sports</div>
         <div class="channel-language">Language : <strong>Hindi</strong></div>
