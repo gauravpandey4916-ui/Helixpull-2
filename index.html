@@ -135,6 +135,7 @@
       50% { opacity: 0.25; transform: scale(0.85); }
     }
 
+    /* Live Scoreboard Widget Styling */
     .community-card {
       background: linear-gradient(145deg, #0b0d13, #080a0f);
       border: 1px solid rgba(255,255,255,0.12); border-radius: 26px;
@@ -143,7 +144,22 @@
 
     .community-title { font-size: clamp(22px, 5vw, 30px); font-weight: 850; margin-bottom: 16px; }
     .community-title span { color: var(--gold); }
-    .community-text { color: var(--muted); font-size: 18px; margin-bottom: 22px; }
+
+    .score-widget-container {
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 20px;
+    }
+
+    #cricket-score-frame {
+      width: 100%;
+      height: 220px;
+      border: none;
+      display: block;
+    }
 
     .telegram-btn {
       width: 100%; min-height: 60px; display: flex; align-items: center;
@@ -238,9 +254,20 @@
       <div class="live-badge"><span class="live-dot"></span> LIVE STREAM</div>
     </div>
 
+    <!-- Live Scoreboard Section -->
     <div class="community-card">
-      <h2 class="community-title">Join the <span>Helixpull</span> Community Hub</h2>
-      <p class="community-text">Live cricket match clips 🎥, backup streaming feeds ⚡ and ongoing sport broadcasts 🏆.</p>
+      <h2 class="community-title">Live Match <span>Scoreboard</span></h2>
+      
+      <div class="score-widget-container">
+        <iframe 
+          id="cricket-score-frame" 
+          src="https://cwidget.crictimes.org/?v=1.1&a=434343&c=cccccc&bo=434343&b=d9d9d9&sb=434343&lb=ffffff" 
+          scrolling="no" 
+          frameborder="0" 
+          allowfullscreen="true">
+        </iframe>
+      </div>
+
       <a class="telegram-btn" href="https://telegram.me/helixpull" target="_blank" rel="noopener noreferrer">
         <span class="telegram-icon">➤</span> Open Telegram Channel
       </a>
@@ -335,7 +362,6 @@
       }
 
       if (!player) {
-        // Direct player setup without UI overlay library
         player = new shaka.Player(DOM.video);
         player.addEventListener("error", () => {
           if (streamData.iframeSrc) {
@@ -435,7 +461,6 @@
       if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
       if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
 
-      // Programmatic un-mute on initial tap
       const enableAudio = () => {
         if (DOM.video) {
           DOM.video.muted = false;
