@@ -1,534 +1,881 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <meta name="theme-color" content="#050505" />
-  <meta name="referrer" content="no-referrer" />
-  <title>HELIXPULL Live Stream</title>
-
-  <!-- Google tag (gtag.js) -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SMZXC121E6"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', 'G-SMZXC121E6');
-  </script>
-
-  <!-- Compiled Shaka Engine without UI Controls -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.11/shaka-player.compiled.js" crossorigin="anonymous"></script>
-
-  <style>
-    :root {
-      --bg: #000000;
-      --card: #090b11;
-      --gold: #f4c542;
-      --gold-bright: #ffd95a;
-      --green: #10b981;
-      --red: #ef4444;
-      --text: #ffffff;
-      --muted: #9da6b8;
-      --transition: all 0.22s ease;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { background: var(--bg); }
-
-    body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, rgba(244,197,66,0.035), transparent 32%), #000;
-      color: var(--text);
-      min-height: 100vh;
-      line-height: 1.5;
-      -webkit-user-select: none;
-      user-select: none;
-      overflow-x: hidden;
-    }
-
-    .container { width: 100%; max-width: 900px; margin: 0 auto; padding: 14px 16px 12px; }
-
-    .header {
-      min-height: 52px; display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 8px 16px; margin-bottom: 16px;
-      background: linear-gradient(145deg, #0b0d13, #07080c);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-    }
-
-    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .brand-dot {
-      width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%;
-      background: var(--gold); box-shadow: 0 0 8px rgba(244,197,66,0.45);
-    }
-    .brand-name { font-size: clamp(17px, 4vw, 22px); font-weight: 850; letter-spacing: -0.5px; }
-
-    .join-header {
-      min-width: 75px; padding: 6px 16px;
-      background: linear-gradient(135deg, var(--gold-bright), #e7ad18);
-      color: #080808; border: none; border-radius: 12px;
-      font-size: 14px; font-weight: 800; cursor: pointer;
-      text-decoration: none; text-align: center; transition: var(--transition);
-    }
-
-    .player-panel {
-      position: relative; background: #000;
-      border: 1px solid rgba(255,255,255,0.11); border-radius: 24px;
-      overflow: hidden; margin-bottom: 20px; box-shadow: 0 14px 40px rgba(0,0,0,0.5);
-    }
-
-    .player-wrapper { width: 100%; position: relative; aspect-ratio: 16 / 9; background: #000; }
-
-    .video-player, #main-iframe {
-      width: 100%; height: 100%; border: none; display: none;
-      position: absolute; inset: 0; background: #000; z-index: 1;
-      object-fit: cover;
-    }
-
-    .player-brand {
-      position: absolute; top: 16px; left: 16px; z-index: 5;
-      padding: 6px 12px; background: rgba(0,0,0,0.75);
-      border: 1px solid rgba(255,255,255,0.15); border-radius: 10px;
-      color: #fff; font-size: 13px; font-weight: 800; pointer-events: none;
-      display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
-    }
-
-    /* Player Overlay Dot: Static Red default */
-    .watermark-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--red);
-      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    /* Active State: Blinking Green */
-    .watermark-dot.is-live {
-      background: var(--green);
-      box-shadow: 0 0 8px rgba(16,185,129,0.8);
-      animation: blink 1.5s infinite ease-in-out;
-    }
-
-    .error-overlay {
-      position: absolute; inset: 0; background: rgba(0,0,0,0.94);
-      display: none; flex-direction: column; align-items: center;
-      justify-content: center; z-index: 10; gap: 14px; padding: 20px; text-align: center;
-    }
-    .error-overlay.visible { display: flex; }
-    .error-message { font-size: 15px; max-width: 320px; color: #fff; }
-
-    .retry-btn {
-      padding: 12px 26px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--gold-bright), #e2aa18);
-      color: #080808; border: none; font-weight: 800; font-size: 14px; cursor: pointer;
-    }
-
-    .channel-card {
-      display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 22px; margin-bottom: 20px;
-      background: linear-gradient(145deg, #0b0d13, #080a0f);
-      border: 1px solid rgba(255,255,255,0.12); border-radius: 22px;
-    }
-
-    .channel-info { flex: 1; min-width: 0; }
-    .channel-title { font-size: clamp(20px, 4vw, 26px); font-weight: 850; margin-bottom: 4px; }
-    .channel-language { color: var(--muted); font-size: 16px; }
-    .channel-language strong { color: #fff; }
-
-    .live-badge {
-      min-width: 150px; padding: 10px 16px; border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.03);
-      color: var(--muted); font-size: 15px; font-weight: 800;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      transition: all 0.3s ease;
-    }
-
-    .live-badge.is-live {
-      border-color: rgba(16,185,129,0.28);
-      background: rgba(16,185,129,0.06);
-      color: var(--green);
-    }
-    
-    /* Channel Card Live Dot: Static Red default */
-    .live-dot { 
-      width: 9px; height: 9px; border-radius: 50%; 
-      background: var(--red); 
-      box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
-      transition: background 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    /* Active State: Blinking Green */
-    .live-dot.is-live {
-      background: var(--green); 
-      box-shadow: 0 0 8px rgba(16,185,129,0.6);
-      animation: blink 1.5s infinite ease-in-out; 
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.25; transform: scale(0.85); }
-    }
-
-    .action-grid { 
-      display: grid; 
-      grid-template-columns: repeat(3, 1fr); 
-      gap: 12px; 
-      margin-bottom: 24px; 
-    }
-
-    .action-btn {
-      min-height: 56px; border-radius: 16px; background: linear-gradient(145deg, #0b0d13, #080a0f);
-      border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 16px; font-weight: 750;
-      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-      text-decoration: none; transition: var(--transition);
-    }
-    
-    .action-btn-gold {
-      background: linear-gradient(135deg, var(--gold-bright), #e4ae1c);
-      color: #080808;
-      border: none;
-    }
-
-    .footer-credit { 
-      text-align: center; 
-      color: #b0b8c8; 
-      font-size: 17px; 
-      font-weight: 500;
-      padding: 8px 10px 24px; 
-      line-height: 1.4;
-    }
-    .footer-top { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 4px; }
-    .footer-bottom { 
-      font-size: 20px; 
-      font-weight: 900; 
-      letter-spacing: 1px; 
-      color: #ffffff;
-      text-transform: uppercase;
-    }
-
-    .toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
-      background: rgba(15,15,15,0.96); color: #fff; padding: 12px 24px; border-radius: 12px;
-      font-size: 14px; font-weight: 650; z-index: 2000; pointer-events: none; opacity: 0;
-      transition: all 0.35s ease; border: 1px solid rgba(244,197,66,0.18);
-    }
-    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    .popup-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: none;
-      align-items: center; justify-content: center; z-index: 1000; padding: 20px;
-    }
-    .popup-overlay.visible { display: flex; }
-
-    .popup-card {
-      background: linear-gradient(145deg, #101219, #08090d); border-radius: 24px;
-      padding: 30px; text-align: center; max-width: 380px; width: 100%;
-      border: 1px solid rgba(244,197,66,0.2);
-    }
-
-    .popup-title { font-size: 24px; font-weight: 850; margin-bottom: 20px; }
-    .popup-btn {
-      display: block; width: 100%; padding: 14px; border: none; border-radius: 13px;
-      font-weight: 800; font-size: 15px; cursor: pointer; margin-top: 10px; text-decoration: none;
-    }
-    .popup-btn-primary { background: #000; color: #ff0000; }
-    .popup-btn-secondary { background: rgba(255,255,255,0.08); color: #fff; }
-
-    @media (max-width: 650px) {
-      .container { padding: 10px 12px 8px; }
-      .header { min-height: 48px; padding: 6px 12px; border-radius: 14px; margin-bottom: 12px; }
-      .brand-name { font-size: 18px; }
-      .join-header { min-width: 65px; padding: 5px 12px; border-radius: 10px; font-size: 12px; }
-      .channel-card { padding: 16px 14px; gap: 12px; border-radius: 18px; flex-wrap: wrap; margin-bottom: 16px; }
-      .live-badge { width: 100%; }
-      .action-grid { gap: 8px; margin-bottom: 18px; }
-      .action-btn { min-height: 52px; font-size: 14px; border-radius: 14px; }
-      .footer-credit { font-size: 15px; }
-      .footer-bottom { font-size: 18px; }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HelixPull Live Sports Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Manrope:wght@400;600;700;800;900&family=Space+Grotesk:wght@500;700;800;900&family=Space+Mono:wght@700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        color: #fff;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+    </style>
 </head>
-
 <body>
 
-  <div class="container">
-    <div class="header">
-      <div class="brand">
-        <div class="brand-dot"></div>
-        <div class="brand-name">HELIXPULL</div>
-      </div>
-      <a class="join-header" href="https://telegram.me/helixpull" target="_blank" rel="noopener noreferrer">Join</a>
-    </div>
+    <helixpull-ui></helixpull-ui>
 
-    <div class="player-panel">
-      <div class="player-wrapper" id="playerContainer">
-        <div class="player-brand"><span class="watermark-dot" id="watermarkDot"></span> LIVE</div>
-        <video id="video" class="video-player" autoplay playsinline controls></video>
-        <iframe id="main-iframe" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen="true" referrerpolicy="no-referrer"></iframe>
-
-        <div id="errorOverlay" class="error-overlay">
-          <p id="errorMsg" class="error-message">Loading Stream...</p>
-          <button class="retry-btn" id="retryBtn">Retry</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="channel-card">
-      <div class="channel-info">
-        <div class="channel-title">Sony Sports</div>
-        <div class="channel-language">Language : <strong>Hindi</strong></div>
-      </div>
-      <div class="live-badge" id="liveBadge"><span class="live-dot" id="liveDot"></span> LIVE STREAM</div>
-    </div>
-
-    <div class="action-grid">
-      <button class="action-btn" id="btnShare"><span class="action-icon">⇧</span> Share</button>
-      <button class="action-btn" id="btnCopyLink"><span class="action-icon">🔗</span> Copy</button>
-      <a class="action-btn action-btn-gold" href="https://telegram.me/helixpull" target="_blank" rel="noopener noreferrer">
-        <span class="action-icon">➤</span> Join
-      </a>
-    </div>
-
-    <div class="footer-credit">
-      <div class="footer-top">Made With ❤️ Made For You 🫶</div>
-      <div class="footer-bottom">© GAURAV × HELIXPULL</div>
-    </div>
-  </div>
-
-  <div id="toast" class="toast"></div>
-
-  <!-- Telegram Popup -->
-  <div id="tgPopup" class="popup-overlay">
-    <div class="popup-card">
-      <div class="popup-title">Join helixpull</div>
-      <button class="popup-btn popup-btn-primary" id="tgJoinBtn1">Join Telegram</button>
-      <button class="popup-btn popup-btn-secondary" id="tgCloseBtn">Already Joined</button>
-    </div>
-  </div>
-
-  <script>
-    "use strict";
-
-    const CONFIG = {
-      telegramLink: "https://telegram.me/helixpull",
-      dataEndpoint: "https://helixpull-cricket.gauravpandey4916.workers.dev/"
+    <script>
+    // Configuration object
+    window.HelixConfig = {
+      sourceUrl: "https://helixpull-cricket.gauravpandey4916.workers.dev/"
     };
 
-    const DOM = {
-      video: document.getElementById("video"),
-      iframe: document.getElementById("main-iframe"),
-      playerContainer: document.getElementById("playerContainer"),
-      errorOverlay: document.getElementById("errorOverlay"),
-      errorMsg: document.getElementById("errorMsg"),
-      retryBtn: document.getElementById("retryBtn"),
-      tgPopup: document.getElementById("tgPopup"),
-      toast: document.getElementById("toast"),
-      btnShare: document.getElementById("btnShare"),
-      btnCopyLink: document.getElementById("btnCopyLink"),
-      tgJoinBtn1: document.getElementById("tgJoinBtn1"),
-      tgCloseBtn: document.getElementById("tgCloseBtn"),
-      watermarkDot: document.getElementById("watermarkDot"),
-      liveDot: document.getElementById("liveDot"),
-      liveBadge: document.getElementById("liveBadge")
-    };
+    class HelixPullUI extends HTMLElement {
+      constructor() {
+        super();
+        this.shadow = this.attachShadow({ mode: 'open' });
+        this.masterChannels = [];
+        this.currentStreamId = null;
+        this.stars = [];
+        this.animationFrameId = null;
+        this.currentParticleRgb = '0, 255, 204'; // Default Cyan Particles
 
-    let player = null;
-    let toastTimer = null;
+        this.shadow.innerHTML =`
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@700&family=Syne:wght@800&display=swap');
 
-    function setLiveStatus(active = false) {
-      if (active) {
-        DOM.watermarkDot.classList.add("is-live");
-        DOM.liveDot.classList.add("is-live");
-        DOM.liveBadge.classList.add("is-live");
-      } else {
-        DOM.watermarkDot.classList.remove("is-live");
-        DOM.liveDot.classList.remove("is-live");
-        DOM.liveBadge.classList.remove("is-live");
+            /* BASE THEME SETUP */
+            :host {
+              --primary-rgb: 0, 255, 204;
+              --accent: #00ffcc;
+              --accent-glow: rgba(0, 255, 204, 0.35);
+              --bg-pure: #05070a;
+              --bg-card: rgba(13, 19, 28, 0.75);
+              --border-glass: rgba(0, 255, 204, 0.12);
+              --border-glass-bright: rgba(0, 255, 204, 0.35);
+              --heading-dynamic: #ffffff;
+              --text-main: #e2e8f0;
+              --text-muted: #64748b;
+              --text-dark: #475569;
+              --btn-main-bg: #00ffcc;
+              --btn-main-text: #05070a;
+              display: block;
+              min-height: 100vh;
+              background-color: var(--bg-pure);
+              color: var(--text-main);
+            }
+
+            /* GOLD THEME (REPLACES LIGHT/CERAMIC) */
+            :host([data-theme="gold"]) {
+              --primary-rgb: 255, 215, 0;
+              --accent: #ffd700;
+              --accent-glow: rgba(255, 215, 0, 0.35);
+              --bg-pure: #080705;
+              --bg-card: rgba(22, 19, 13, 0.8);
+              --border-glass: rgba(255, 215, 0, 0.15);
+              --border-glass-bright: rgba(255, 215, 0, 0.4);
+              --heading-dynamic: #ffffff;
+              --text-main: #f3f0e6;
+              --text-muted: #8c826b;
+              --text-dark: #5c5545;
+              --btn-main-bg: #ffd700;
+              --btn-main-text: #080705;
+            }
+
+            * { box-sizing: border-box; }
+
+            /* BOOT SCREEN STYLES (MATCHED LANDSCAPE GLOW DESIGN) */
+            .boot {
+              position: fixed;
+              inset: 0;
+              z-index: 2000;
+              background: #000000;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              padding: clamp(20px, 4vw, 40px) clamp(24px, 5vw, 60px);
+              font-family: system-ui, -apple-system, sans-serif;
+              color: #ffffff;
+              transition: opacity 0.5s ease, visibility 0.5s ease;
+            }
+            .boot.hide {
+              opacity: 0;
+              visibility: hidden;
+              pointer-events: none;
+            }
+            .boot-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: clamp(12px, 1.5vw, 16px);
+              font-weight: 700;
+              letter-spacing: 3px;
+              color: #64748b;
+              text-transform: uppercase;
+            }
+            .boot-time {
+              font-family: monospace;
+              letter-spacing: 2px;
+              color: #94a3b8;
+            }
+            .boot-center {
+              display: flex;
+              align-items: center;
+              justify-content: flex-start;
+              gap: clamp(16px, 3vw, 28px);
+              width: 100%;
+              max-width: 1200px;
+              margin: 0 auto;
+              padding-left: clamp(10px, 2vw, 30px);
+            }
+            .boot-logo-wrap {
+              width: clamp(60px, 8vw, 90px);
+              height: clamp(60px, 8vw, 90px);
+              border-radius: 20px;
+              padding: 2px;
+              background: rgba(var(--primary-rgb), 0.3);
+              box-shadow: 0 0 35px var(--accent-glow), 0 0 15px var(--accent-glow);
+              flex-shrink: 0;
+            }
+            .boot-logo-wrap img {
+              width: 100%;
+              height: 100%;
+              border-radius: 18px;
+              object-fit: cover;
+            }
+            .boot-title {
+              font-size: clamp(32px, 5vw, 56px);
+              font-weight: 900;
+              letter-spacing: 1px;
+              text-transform: uppercase;
+              color: #ffffff;
+            }
+            .boot-footer {
+              width: 100%;
+              max-width: 100%;
+              margin: 0 auto;
+            }
+            .boot-bar {
+              width: 100%;
+              height: 4px;
+              background: rgba(255, 255, 255, 0.12);
+              border-radius: 2px;
+              overflow: hidden;
+              margin-bottom: 16px;
+            }
+            .boot-fill {
+              height: 100%;
+              width: 0%;
+              background: var(--accent);
+              box-shadow: 0 0 14px var(--accent), 0 0 6px var(--accent);
+              transition: width 0.1s linear;
+            }
+            .boot-status {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: clamp(11px, 1.2vw, 14px);
+              font-weight: 800;
+              letter-spacing: 2px;
+              text-transform: uppercase;
+            }
+            .boot-label { color: #64748b; }
+            .boot-percent {
+              color: var(--accent);
+              font-family: monospace;
+            }
+
+            /* WELCOME GATE MODAL */
+            .f1-modal-overlay {
+              position: fixed;
+              inset: 0;
+              z-index: 1500;
+              background: rgba(0, 0, 0, 0.85);
+              backdrop-filter: blur(8px);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              opacity: 0;
+              visibility: hidden;
+              transition: all 0.3s ease;
+            }
+            .f1-modal-overlay.open {
+              opacity: 1;
+              visibility: visible;
+            }
+            .f1-card {
+              background: var(--bg-card);
+              border: 1px solid var(--border-glass-bright);
+              border-radius: 24px;
+              padding: 40px;
+              max-width: 440px;
+              width: 90%;
+              text-align: center;
+              box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            }
+            .f1-avatar-wrap img {
+              width: 80px;
+              height: 80px;
+              border-radius: 50%;
+              border: 2px solid var(--accent);
+            }
+            .f1-eyebrow {
+              font-size: 12px;
+              letter-spacing: 2px;
+              color: var(--accent);
+              margin-top: 15px;
+            }
+            .f1-title {
+              font-size: 24px;
+              color: var(--heading-dynamic);
+              margin: 10px 0;
+            }
+            .f1-sub {
+              font-size: 14px;
+              color: var(--text-muted);
+              margin-bottom: 25px;
+            }
+            .f1-text-btn {
+              background: var(--btn-main-bg);
+              color: var(--btn-main-text);
+              border: none;
+              padding: 12px 28px;
+              border-radius: 30px;
+              font-weight: 700;
+              cursor: pointer;
+              transition: transform 0.2s ease;
+            }
+            .f1-text-btn:hover { transform: scale(1.05); }
+
+            /* BACKGROUND CANVAS */
+            #warpGridCanvas {
+              position: fixed;
+              top: 0;
+              left: 0;
+              width: 100vw;
+              height: 100vh;
+              z-index: 0;
+              pointer-events: none;
+            }
+
+            /* CONTAINER & VIEWS */
+            .container {
+              position: relative;
+              z-index: 1;
+              max-width: 1200px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .nav {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 15px 0;
+            }
+            .brand-title {
+              font-size: 24px;
+              font-weight: 900;
+              letter-spacing: 1px;
+              color: var(--heading-dynamic);
+              cursor: pointer;
+            }
+            .live-pill-badge {
+              background: rgba(239, 68, 68, 0.15);
+              color: #ef4444;
+              border: 1px solid rgba(239, 68, 68, 0.3);
+              padding: 6px 14px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 700;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .pulsing-live-dot {
+              width: 8px;
+              height: 8px;
+              background: #ef4444;
+              border-radius: 50%;
+              box-shadow: 0 0 8px #ef4444;
+            }
+            .view-section { display: none; }
+            .view-section.active { display: block; }
+
+            .hero { margin: 40px 0 20px 0; }
+            .hero-tag { 
+              color: var(--accent); 
+              font-size: 12px; 
+              letter-spacing: 2px; 
+              font-weight: 700; 
+              font-family: 'Space Mono', monospace;
+              text-transform: uppercase;
+            }
+            .hero-headline { 
+              font-family: 'Syne', system-ui, sans-serif;
+              font-size: clamp(38px, 6vw, 64px); 
+              font-weight: 800; 
+              text-transform: uppercase;
+              letter-spacing: -1px;
+              line-height: 0.95; 
+              margin: 10px 0; 
+              color: var(--heading-dynamic); 
+            }
+            .hero-headline .accent-txt { color: var(--accent); }
+            .hero-details { 
+              font-family: 'Space Mono', monospace;
+              font-size: 13px; 
+              color: var(--text-muted); 
+              letter-spacing: 1px; 
+              text-transform: uppercase;
+            }
+            .meta-separator { margin: 0 10px; opacity: 0.3; }
+            .track-separator-beam { height: 1px; background: linear-gradient(90deg, transparent, var(--border-glass-bright), transparent); margin: 30px 0; }
+
+            /* CHANNELS GRID */
+            .channels-grid {
+              display: grid;
+              grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+              gap: 24px;
+            }
+            .channel-card {
+              background: var(--bg-card);
+              border: 1px solid var(--border-glass);
+              border-radius: 16px;
+              overflow: hidden;
+              cursor: pointer;
+              transition: all 0.3s ease;
+            }
+            .channel-card:hover {
+              transform: translateY(-5px);
+              border-color: var(--border-glass-bright);
+              box-shadow: 0 10px 30px var(--accent-glow);
+            }
+            .card-thumbnail {
+              height: 160px;
+              background: rgba(0,0,0,0.4);
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              background-size: cover;
+              background-position: center;
+            }
+            .channel-badge-box svg { width: 36px; height: 36px; fill: var(--accent); }
+            .card-network-tag { font-size: 12px; letter-spacing: 2px; color: var(--accent); font-weight: 700; margin-top: 8px; }
+            .play-overlay-icon {
+              position: absolute;
+              inset: 0;
+              background: rgba(0,0,0,0.4);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              opacity: 0;
+              transition: opacity 0.2s ease;
+            }
+            .play-overlay-icon svg { width: 44px; height: 44px; fill: #ffffff; }
+            .channel-card:hover .play-overlay-icon { opacity: 1; }
+            .card-body { padding: 18px; }
+            .card-title { font-size: 18px; font-weight: 700; color: var(--heading-dynamic); margin-bottom: 8px; }
+            .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+            /* PLAYER VIEW */
+            .player-top-nav { margin-bottom: 20px; }
+            .back-home-btn {
+              background: transparent;
+              border: 1px solid var(--border-glass);
+              color: var(--text-main);
+              padding: 10px 20px;
+              border-radius: 20px;
+              cursor: pointer;
+              transition: background 0.2s;
+            }
+            .back-home-btn:hover { background: var(--border-glass); }
+            .player-rig-box {
+              position: relative;
+              width: 100%;
+              padding-top: 56.25%;
+              background: #000;
+              border-radius: 16px;
+              overflow: hidden;
+              border: 1px solid var(--border-glass);
+            }
+            .player-rig-box iframe {
+              position: absolute;
+              top: 0; left: 0; width: 100%; height: 100%;
+              border: none;
+            }
+            .blended-fs-btn {
+              position: absolute;
+              bottom: 15px; right: 15px;
+              background: rgba(0,0,0,0.6);
+              border: 1px solid rgba(255,255,255,0.2);
+              border-radius: 8px;
+              width: 36px; height: 36px;
+              display: flex; align-items: center; justify-content: center;
+              cursor: pointer;
+              fill: #fff;
+            }
+            .blended-fs-btn svg { width: 20px; height: 20px; }
+            .player-meta-bar {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              margin-top: 20px;
+            }
+            .stream-title-group strong { display: block; font-size: 20px; color: var(--heading-dynamic); }
+            .stream-title-group span { font-size: 13px; color: var(--text-muted); }
+            .share-action-btn {
+              background: var(--bg-card);
+              border: 1px solid var(--border-glass);
+              color: var(--text-main);
+              padding: 10px 18px;
+              border-radius: 12px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+
+            /* THEME SWITCHER */
+            .theme-switch-deck {
+              position: fixed;
+              bottom: 24px; right: 24px;
+              z-index: 100;
+              background: var(--bg-card);
+              border: 1px solid var(--border-glass);
+              border-radius: 30px;
+              padding: 4px;
+              display: flex;
+              gap: 4px;
+              backdrop-filter: blur(10px);
+            }
+            .theme-switch-deck.hidden { display: none; }
+            .mode-toggle-btn {
+              background: transparent;
+              border: none;
+              color: var(--text-muted);
+              padding: 8px 16px;
+              border-radius: 20px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            .mode-toggle-btn.active {
+              background: var(--btn-main-bg);
+              color: var(--btn-main-text);
+            }
+          </style>
+
+          <!-- BOOT SCREEN -->
+          <div class="boot" id="boot">
+              <div class="boot-header">
+                  <div>HELIXPULL / STREAMING WEB</div>
+                  <div class="boot-time" id="bootTime">00:00</div>
+              </div>
+
+              <div class="boot-center">
+                  <div class="boot-logo-wrap">
+                      <img src="https://files.catbox.moe/0ghrsb.jpg" alt="HELIXPULL Logo">
+                  </div>
+                  <div class="boot-title">HELIXPULL</div>
+              </div>
+
+              <div class="boot-footer">
+                  <div class="boot-bar">
+                      <div class="boot-fill" id="bootFill"></div>
+                  </div>
+                  <div class="boot-status">
+                      <span class="boot-label" id="bootStatus">INITIALIZING SIGNAL</span>
+                      <span class="boot-percent" id="bootPercent">0%</span>
+                  </div>
+              </div>
+          </div>
+
+          <!-- WELCOME GATE MODAL -->
+          <div class="f1-modal-overlay" id="welcomeGate">
+              <div class="f1-card">
+                  <div class="f1-avatar-wrap">
+                      <img src="https://files.catbox.moe/0ghrsb.jpg" alt="HELIXPULL">
+                  </div>
+                  <div class="f1-eyebrow">OFFICIAL HELIXPULL</div>
+                  <h2 class="f1-title">The match starts here.</h2>
+                  <p class="f1-sub">Welcome to the official HelixPull live streaming portal for sports, clips, and real-time updates.</p>
+                  <button class="f1-text-btn" id="dismissWelcomeBtn">CONTINUE TO HELIXPULL</button>
+              </div>
+          </div>
+
+          <canvas id="warpGridCanvas"></canvas>
+
+          <div class="container" id="mainContainer">
+            <header class="nav">
+              <a class="brand" id="brandHomeLink">
+                <div class="brand-title">HelixPull</div>
+              </a>
+              <div class="nav-actions">
+                <div class="live-pill-badge"><i class="pulsing-live-dot"></i>ON AIR</div>
+              </div>
+            </header>
+
+            <div id="home-view" class="view-section active">
+              <section class="hero">
+                <div class="hero-tag">LIVE BROADCASTS</div>
+                <h1 class="hero-headline">SPORTS <br><span class="accent-txt">CHANNELS.</span></h1>
+                <div class="hero-details">
+                  <b>MASTER DATABASE</b><span class="meta-separator"></span>ALL CHANNELS LIVE<span class="meta-separator"></span>SELECT TO WATCH
+                </div>
+              </section>
+
+              <div class="track-separator-beam"></div>
+
+              <div id="channels-grid" class="channels-grid">
+                <div class="state-container">
+                  <div class="spinner"></div>
+                  <p>Fetching professional sports feed...</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="player-view" class="view-section">
+              <div class="player-top-nav">
+                <button class="back-home-btn" id="backHomeBtn">&#8592; Back to Channels</button>
+              </div>
+
+              <div class="player-rig-box" id="playerContainer">
+                <iframe id="player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen="true"></iframe>
+                <button class="blended-fs-btn" id="blendedFsBtn" title="Toggle Fullscreen">
+                  <svg id="fsIconSvg" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                </button>
+              </div 
+                            </div>
+              <div class="player-meta-bar">
+                <div class="stream-title-group">
+                  <strong id="activeStreamTitleDisplay">Live Broadcast</strong>
+                  <span>HelixPull High-Definition Stream</span>
+                </div>
+                <button class="share-action-btn" id="btnShare">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
+                  <span id="shareBtnText">SHARE STREAM</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <aside class="theme-switch-deck" id="themeSwitchDeck">
+            <button class="mode-toggle-btn active" id="themeDarkBtn"><i></i> Obsidian</button>
+            <button class="mode-toggle-btn" id="themeGoldBtn"><i></i> Gold</button>
+          </aside>
+        `;
       }
-    }
 
-    function showToast(msg = "", duration = 2600) {
-      clearTimeout(toastTimer);
-      DOM.toast.textContent = msg;
-      DOM.toast.classList.add("show");
-      toastTimer = setTimeout(() => DOM.toast.classList.remove("show"), duration);
-    }
-
-    function showError(msg = "") {
-      setLiveStatus(false);
-      DOM.errorMsg.textContent = msg || "Playback error. Tap retry.";
-      DOM.errorOverlay.classList.add("visible");
-      DOM.video.style.display = "none";
-      DOM.iframe.style.display = "none";
-    }
-
-    function hideError() {
-      DOM.errorOverlay.classList.remove("visible");
-    }
-
-    function loadIframe(url) {
-      hideError();
-      setLiveStatus(false);
-      DOM.video.style.display = "none";
-      DOM.iframe.style.display = "block";
-      
-      DOM.iframe.src = "about:blank";
-      setTimeout(() => {
-        DOM.iframe.src = url;
-        showToast("Stream Loaded");
-        setLiveStatus(true);
-      }, 50);
-    }
-
-    async function loadShakaPlayer(streamData = {}, rawUrl = "") {
-      hideError();
-      setLiveStatus(false);
-      DOM.iframe.style.display = "none";
-      DOM.video.style.display = "block";
-
-      if (!window.shaka || !shaka.Player.isBrowserSupported()) {
-        if (streamData.iframeSrc) return loadIframe(streamData.iframeSrc);
-        showError("Browser does not support video player.");
-        return;
+      connectedCallback() {
+        this.initWarpField();
+        this.initEventListeners();
+        this.setupMessageListener();
+        this.fetchChannels();
+        this.handleUrlRouting();
+        this.startBootSequence();
       }
 
-      if (!player) {
-        player = new shaka.Player(DOM.video);
-        player.addEventListener("error", () => {
-          if (streamData.iframeSrc) {
-            loadIframe(streamData.iframeSrc);
+      disconnectedCallback() {
+        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+      }
+
+      updateBootTime() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const timeEl = this.shadow.querySelector('#bootTime');
+        if (timeEl) timeEl.textContent = `${hours}:${minutes}`;
+      }
+
+      startBootSequence() {
+        this.updateBootTime();
+        const fill = this.shadow.querySelector('#bootFill');
+        const percent = this.shadow.querySelector('#bootPercent');
+        const status = this.shadow.querySelector('#bootStatus');
+        
+        let progress = 0;
+        const interval = setInterval(() => {
+          progress += Math.floor(Math.random() * 15) + 5;
+          
+          if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            
+            fill.style.width = "100%";
+            percent.textContent = "100%";
+            status.textContent = "READY";
+            
+            setTimeout(() => {
+              this.finishBoot();
+            }, 300);
           } else {
-            showError("Stream error. Verify source link.");
+            fill.style.width = progress + "%";
+            percent.textContent = progress + "%";
+          }
+        }, 120);
+      }
+
+      finishBoot() {
+        this.shadow.querySelector('#boot').classList.add('hide');
+
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('id')) {
+          setTimeout(() => {
+            this.shadow.querySelector('#welcomeGate').classList.add('open');
+          }, 250);
+        }
+      }
+
+      dismissWelcome() {
+        this.shadow.querySelector('#welcomeGate').classList.remove('open');
+      }
+
+      async fetchChannels() {
+        const grid = this.shadow.querySelector('#channels-grid');
+        let data = null;
+
+        try {
+          const res = await fetch(window.HelixConfig.sourceUrl);
+          data = await res.json();
+        } catch (err) {
+          console.warn("Direct fetch failed, attempting proxy fallback...", err);
+          try {
+            const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(window.HelixConfig.sourceUrl);
+            const res = await fetch(proxyUrl);
+            data = await res.json();
+          } catch (proxyErr) {
+            console.error("CORS proxy fetch failed:", proxyErr);
+          }
+        }
+
+        if (data) {
+          const rawChannels = Array.isArray(data) ? data : (data.iframes || data.channels || data.streams || data.data || []);
+          
+          // Filter to find channels matching "Star Sports Hindi" and keep only the first two
+          const filteredChannels = rawChannels.filter(channel => {
+            const title = (channel.title || channel.name || channel.channel || '').toLowerCase();
+            return title.includes('star sports hindi');
+          });
+
+          this.masterChannels = filteredChannels.slice(0, 2);
+        }
+
+        if (!this.masterChannels || this.masterChannels.length === 0) {
+          grid.innerHTML = '<div class="state-container" style="color:#ef4444;">No channels found.</div>';
+          return;
+        }
+
+        this.renderGrid();
+      }
+
+      renderGrid() {
+        const grid = this.shadow.querySelector('#channels-grid');
+        grid.innerHTML = '';
+
+        // Assign custom display titles for web view
+        const customNames = {
+          0: "Sony Sports",
+          1: "Sony Liv"
+        };
+
+        this.masterChannels.forEach((channel, index) => {
+          const channelId = channel.id !== undefined ? channel.id : index;
+          
+          const rawTitle = channel.title || channel.name || channel.channel || `Channel ${index + 1}`;
+          const title = customNames[index] || rawTitle;
+
+          const poster = channel.poster || channel.image || channel.logo || channel.img || '';
+
+          // Sony Network Icon and Tag Styling
+          let tagText = 'SONY';
+          let badgeIcon = `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h18v8zM6 10h2v4H6z"/></svg>`;
+
+          const card = document.createElement('div');
+          card.className = 'channel-card';
+          card.onclick = () => this.openPlayer(channelId);
+
+          let thumbHtml = poster 
+            ? `<div class="card-thumbnail" style="background-image: url('${poster}')"><div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>`
+            : `<div class="card-thumbnail">
+                 <div class="channel-badge-box">${badgeIcon}</div>
+                 <span class="card-network-tag">${tagText}</span>
+                 <div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+               </div>`;
+
+          card.innerHTML = `
+            ${thumbHtml}
+            <div class="card-body">
+              <div class="card-title">${title}</div>
+              <div class="card-meta"><span>HD FEED</span><span style="color:var(--accent);">WATCH NOW</span></div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      }
+
+      openPlayer(identifier) {
+        const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
+        if (!target) return;
+
+        let streamUrl = target.iframeSrc || target.url || target.link || target.stream || target.file || target.source || target.src;
+        if (!streamUrl) {
+          streamUrl = `https://helixpull-cricket.gauravpandey4916.workers.dev/?id=${target.id || identifier}`;
+        }
+
+        const customNames = { 0: "Sony Sports", 1: "Sony Liv" };
+        const title = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
+        this.currentStreamId = identifier;
+
+        this.shadow.querySelector('#activeStreamTitleDisplay').innerText = title;
+        this.shadow.querySelector('#player').src = streamUrl;
+
+        this.shadow.querySelector('#home-view').classList.remove('active');
+        this.shadow.querySelector('#player-view').classList.add('active');
+
+        const query = `?id=${identifier}`;
+        if (window.location.search !== query) {
+          history.pushState({ playerOpen: true, id: identifier }, '', query);
+        }
+        window.scrollTo(0, 0);
+      }
+
+      closePlayer() {
+        this.shadow.querySelector('#player').src = 'about:blank';
+
+        try { if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); } catch(err){}
+        this.shadow.querySelector('#playerContainer').classList.remove('fs-active');
+        this.shadow.querySelector('#themeSwitchDeck').classList.remove('hidden');
+
+        this.shadow.querySelector('#player-view').classList.remove('active');
+        this.shadow.querySelector('#home-view').classList.add('active');
+        this.currentStreamId = null;
+
+        if (window.location.search !== '') {
+          history.pushState({}, '', window.location.pathname);
+        }
+      }
+
+      handleUrlRouting() {
+        const params = new URLSearchParams(window.location.search);
+        const id = params.get('id');
+        if (id !== null && this.masterChannels.length > 0) {
+          this.openPlayer(id);
+        }
+      }
+
+      toggleFullscreen() {
+        const rig = this.shadow.querySelector('#playerContainer');
+        const themeDeck = this.shadow.querySelector('#themeSwitchDeck');
+        const fsIconSvg = this.shadow.querySelector('#fsIconSvg');
+        if (!rig) return;
+
+        const isFull = document.fullscreenElement || rig.classList.contains('fs-active');
+        if (!isFull) {
+          rig.classList.add('fs-active');
+          if (themeDeck) themeDeck.classList.add('hidden');
+          if (fsIconSvg) fsIconSvg.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
+          try { if (rig.requestFullscreen) rig.requestFullscreen().catch(()=>{}); } catch(err){}
+        } else {
+          rig.classList.remove('fs-active');
+          if (themeDeck) themeDeck.classList.remove('hidden');
+          if (fsIconSvg) fsIconSvg.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+          try { if (document.exitFullscreen) document.exitFullscreen().catch(()=>{}); } catch(err){}
+        }
+      }
+
+      setupMessageListener() {
+        document.addEventListener('fullscreenchange', () => {
+          const rig = this.shadow.querySelector('#playerContainer');
+          const themeDeck = this.shadow.querySelector('#themeSwitchDeck');
+          const fsIconSvg = this.shadow.querySelector('#fsIconSvg');
+
+          if (!document.fullscreenElement && !document.webkitIsFullScreen && rig) {
+            rig.classList.remove('fs-active');
+            if (themeDeck) themeDeck.classList.remove('hidden');
+            if (fsIconSvg) {
+              fsIconSvg.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
+            }
           }
         });
       }
 
-      if (streamData.drm && streamData.drm.clearKeys) {
-        player.configure({ drm: { clearKeys: streamData.drm.clearKeys } });
+      initEventListeners() {
+        this.shadow.querySelector('#backHomeBtn').onclick = () => this.closePlayer();
+        this.shadow.querySelector('#brandHomeLink').onclick = () => this.closePlayer();
+        this.shadow.querySelector('#dismissWelcomeBtn').onclick = () => this.dismissWelcome();
+        this.shadow.querySelector('#blendedFsBtn').onclick = () => this.toggleFullscreen();
+
+        /* Theme Switches */
+        this.shadow.querySelector('#themeDarkBtn').onclick = () => {
+          this.removeAttribute('data-theme');
+          this.shadow.querySelector('#themeDarkBtn').classList.add('active');
+          this.shadow.querySelector('#themeGoldBtn').classList.remove('active');
+          this.currentParticleRgb = '0, 255, 204'; // Cyan particles
+        };
+
+        this.shadow.querySelector('#themeGoldBtn').onclick = () => {
+          this.setAttribute('data-theme', 'gold');
+          this.shadow.querySelector('#themeGoldBtn').classList.add('active');
+          this.shadow.querySelector('#themeDarkBtn').classList.remove('active');
+          this.currentParticleRgb = '255, 215, 0'; // Gold particles
+        };
+
+        const btnShare = this.shadow.querySelector('#btnShare');
+        const shareText = this.shadow.querySelector('#shareBtnText');
+        btnShare.onclick = async () => {
+          try {
+            if (navigator.share) {
+              await navigator.share({ title: 'HelixPull Live', url: window.location.href });
+            } else {
+              await navigator.clipboard.writeText(window.location.href);
+              shareText.textContent = "COPIED!";
+              setTimeout(() => { shareText.textContent = "SHARE STREAM"; }, 1800);
+            }
+          } catch(err){}
+        };
       }
 
-      player.getNetworkingEngine().clearAllRequestFilters();
-      player.getNetworkingEngine().registerRequestFilter((type, request) => {
-        if (streamData.cookie) {
-          const rawToken = streamData.cookie.replace(/^__hdnea__=/, "").replace(/^Cookie:\s*/i, "").trim();
-          if (
-            (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
-             type === shaka.net.NetworkingEngine.RequestType.SEGMENT) &&
-            request.uris[0] &&
-            !request.uris[0].includes("__hdnea__=")
-          ) {
-            const sep = request.uris[0].includes("?") ? "&" : "?";
-            request.uris[0] += sep + "__hdnea__=" + rawToken;
-          }
-        }
-      });
+      initWarpField() {
+        const canvas = this.shadow.getElementById('warpGridCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        window.addEventListener('resize', resize);
+        resize();
 
-      try {
-        const proxiedUrl = "https://corsproxy.io/?_" + encodeURIComponent(rawUrl);
-        await player.load(proxiedUrl);
-        DOM.video.play().catch(() => {});
-        showToast("Stream Playing");
-        setLiveStatus(true);
-      } catch (err) {
-        if (streamData.iframeSrc) {
-          loadIframe(streamData.iframeSrc);
-        } else {
-          showError("Playback error. Failed to load stream.");
+        for (let i = 0; i < 100; i++) {
+          this.stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            length: Math.random() * 20 + 10,
+            speed: Math.random() * 2 + 1,
+            alpha: Math.random() * 0.5 + 0.1
+          });
         }
+
+        const render = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.lineWidth = 1.2;
+          const activeRgb = this.currentParticleRgb || '0, 255, 204';
+
+          this.stars.forEach(star => {
+            ctx.strokeStyle = `rgba(${activeRgb}, ${star.alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(star.x, star.y);
+            ctx.lineTo(star.x + star.length, star.y);
+            ctx.stroke();
+            star.x += star.speed;
+            if (star.x > canvas.width) {
+              star.x = -star.length;
+              star.y = Math.random() * canvas.height;
+            }
+          });
+          this.animationFrameId = requestAnimationFrame(render);
+        };
+        render();
       }
     }
 
-    async function startStream() {
-      hideError();
-      setLiveStatus(false);
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const requestedId = (urlParams.get("id") || "").trim();
-
-        const response = await fetch(CONFIG.dataEndpoint, { cache: "no-store" });
-        if (!response.ok) throw new Error("Unable to fetch stream configuration.");
-
-        const data = await response.json();
-
-        let targetData = null;
-        if (Array.isArray(data)) {
-          targetData = data.find(item => item.id === requestedId) || data[0];
-        } else if (data.iframes) {
-          targetData = data.iframes.find(item => item.id === requestedId) || data.iframes[0];
-        } else {
-          targetData = data;
-        }
-
-        if (!targetData) throw new Error("Channel ID not found.");
-
-        if (targetData.hit) fetch(targetData.hit).catch(() => {});
-
-        const rawUrl = targetData.streamUrl || targetData.link || targetData.m3u8 || targetData.mpd;
-        const isDirectStream = rawUrl && (rawUrl.includes(".m3u8") || rawUrl.includes(".mpd"));
-
-        if (isDirectStream) {
-          await loadShakaPlayer(targetData, rawUrl);
-        } else if (targetData.iframeSrc || targetData.type === "iframe" || (rawUrl && rawUrl.includes("http"))) {
-          loadIframe(targetData.iframeSrc || rawUrl);
-        } else {
-          throw new Error("No valid stream source or iframe URL found.");
-        }
-      } catch (err) {
-        showError(err && err.message ? err.message : "Failed to load stream.");
-      }
-    }
-
-    async function handleShare() {
-      if (navigator.share) {
-        try { 
-          await navigator.share({ title: document.title, url: window.location.href }); 
-          return; 
-        } catch {}
-      }
-      navigator.clipboard.writeText(window.location.href);
-      showToast("Link copied!");
-    }
-
-    function initEvents() {
-      DOM.retryBtn.addEventListener("click", startStream);
-      if (DOM.btnShare) DOM.btnShare.addEventListener("click", handleShare);
-      if (DOM.btnCopyLink) DOM.btnCopyLink.addEventListener("click", handleShare);
-
-      // Turn live dots green once the video actually starts playing
-      DOM.video.addEventListener("playing", () => {
-        setLiveStatus(true);
-      });
-
-      const enableAudio = () => {
-        if (DOM.video) {
-          DOM.video.muted = false;
-        }
-        document.removeEventListener("click", enableAudio);
-        document.removeEventListener("touchstart", enableAudio);
-      };
-      document.addEventListener("click", enableAudio);
-      document.addEventListener("touchstart", enableAudio);
-
-      const openTg = () => {
-        window.open(CONFIG.telegramLink, "_blank");
-        DOM.tgPopup.classList.remove("visible");
-        startStream();
-      };
-
-      DOM.tgJoinBtn1.addEventListener("click", openTg);
-      DOM.tgCloseBtn.addEventListener("click", () => {
-        DOM.tgPopup.classList.remove("visible");
-        startStream();
-      });
-
-      DOM.tgPopup.classList.add("visible");
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.shaka && typeof shaka.polyfill !== "undefined") {
-        shaka.polyfill.installAll();
-      }
-      initEvents();
-    });
-  </script>
+    customElements.define('helixpull-ui', HelixPullUI);
+    </script>
 </body>
-  </html>
-  
+</html>
