@@ -734,7 +734,7 @@
         const title = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
         this.currentStreamId = identifier;
 
-        this.shadow.querySelector('#activeStreamTitleDisplay').innerText = Live Stream;
+        this.shadow.querySelector('#activeStreamTitleDisplay').innerText ="Live Stream";
         this.shadow.querySelector('#player').src = streamUrl;
 
         this.shadow.querySelector('#home-view').classList.remove('active');
