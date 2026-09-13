@@ -276,6 +276,17 @@
               letter-spacing: 1px;
               color: var(--heading-dynamic);
               cursor: pointer;
+              .brand-sub {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;            /* Reduced font size */
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 1.5px;
+  text-transform: uppercase; /* Ensures all letters render in CAPITAL */
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
             }
             .live-pill-badge {
               background: rgba(239, 68, 68, 0.15);
@@ -517,6 +528,7 @@
             <header class="nav">
               <a class="brand" id="brandHomeLink">
                 <div class="brand-title">HelixPull</div>
+                <div class="brand-sub">By Gaurav</div>
               </a>
               <div class="nav-actions">
                 <div class="live-pill-badge"><i class="pulsing-live-dot"></i>ON AIR</div>
