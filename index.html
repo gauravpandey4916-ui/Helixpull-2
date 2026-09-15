@@ -732,16 +732,6 @@
           grid.appendChild(card);
         });
       }
-
-        const customNames = { 0: "Fancode", 1: "Sony Liv" };
-        const title = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
-        this.currentStreamId = identifier;
-
-        this.shadow.querySelector('#activeStreamTitleDisplay').innerText ="Live Stream";
-        this.shadow.querySelector('#player').src = streamUrl;
-
-        this.shadow.querySelector('#home-view').classList.remove('active');
-        this.shadow.querySelector('#player-view').classList.add('active');
       openPlayer(identifier) {
         const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
         const titleText = target ? (target.title || target.name || '').toLowerCase() : "";
