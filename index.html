@@ -743,7 +743,8 @@
 
         this.shadow.querySelector('#home-view').classList.remove('active');
         this.shadow.querySelector('#player-view').classList.add('active');
-  OpenPlayer(identifier) {
+
+        openPlayer(identifier){
     const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
     if (!target) return;
 
