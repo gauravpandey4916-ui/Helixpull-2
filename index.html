@@ -743,7 +743,7 @@
 
         this.shadow.querySelector('#home-view').classList.remove('active');
         this.shadow.querySelector('#player-view').classList.add('active');
-      openPlayer(identifier) {
+          openPlayer(identifier) {
         const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
         if (!target) return;
 
@@ -751,7 +751,7 @@
         let streamUrl = "";
 
         // Override specifically for Sony Liv to use the BoxCast link
-        if (titleText.includes('sony')) {
+        if (identifier == 1 || titleText.includes('sony')) {
           streamUrl = "https://play.boxcast.com/p/psnzgzfg4vgkvej2elbb/v/all-byteranges-ext.m3u8?Expires=1789591552&Signature=cuW1HK7EVNhLVHrgt0ExuR~EVs1PmVnCZnaPrXKN4rBPMqaIiMNpDGdM-fxzTTohO2uU-IUYzxRt5uumDWPhHiX~HrEOggXrvLP2RqToQ~9N4yYegn1uFG5L~P4OIw7G4RkvyYAaRjId~m-GAwerwxSEGpeJoN7OUQrTzeWyi-xsB9N~ljzEQT4GNm9hF~IIP-FpdOUmlb8lON~YCXmKjwsGuMIR2RI0o97XEbCBW3Emz2eNZubVx6axtJePHZVQvoGZefzHsJRLjcbdnS0X~ac6r4W~sbn4AGRPrjfowW7nPPKMtNLeOXwrrOQF8my5vNuXJHLLpaV02Ohyh8ZWAg__&Key-Pair-Id=APKAJ7GUCBQUK6NTWZCA";
         } else {
           streamUrl = target.iframeSrc || target.url || target.link || target.stream || target.file || target.source || target.src;
@@ -775,7 +775,9 @@
           history.pushState({ playerOpen: true, id: identifier }, '', query);
         }
         window.scrollTo(0, 0);
-      }
+          }
+        
+      
 
       closePlayer() {
         this.shadow.querySelector('#player').src = 'about:blank';
