@@ -743,35 +743,44 @@
 
         this.shadow.querySelector('#home-view').classList.remove('active');
         this.shadow.querySelector('#player-view').classList.add('active');
+      openPlayer(identifier) {
+        const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
+        if (!target) return;
 
-        openPlayer(identifier){
-    const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
-    if (!target) return;
+        const titleText = (target.title || target.name || '').toLowerCase();
+        let streamUrl = "";
 
-    const title = (target.title || target.name || '').toLowerCase();
-    let streamUrl = "";
+        // Override specifically for Sony Liv to use the BoxCast link
+        if (titleText.includes('sony')) {
+          streamUrl = "https://play.boxcast.com/p/psnzgzfg4vgkvej2elbb/v/all-byteranges-ext.m3u8?Expires=1789591552&Signature=cuW1HK7EVNhLVHrgt0ExuR~EVs1PmVnCZnaPrXKN4rBPMqaIiMNpDGdM-fxzTTohO2uU-IUYzxRt5uumDWPhHiX~HrEOggXrvLP2RqToQ~9N4yYegn1uFG5L~P4OIw7G4RkvyYAaRjId~m-GAwerwxSEGpeJoN7OUQrTzeWyi-xsB9N~ljzEQT4GNm9hF~IIP-FpdOUmlb8lON~YCXmKjwsGuMIR2RI0o97XEbCBW3Emz2eNZubVx6axtJePHZVQvoGZefzHsJRLjcbdnS0X~ac6r4W~sbn4AGRPrjfowW7nPPKMtNLeOXwrrOQF8my5vNuXJHLLpaV02Ohyh8ZWAg__&Key-Pair-Id=APKAJ7GUCBQUK6NTWZCA";
+        } else {
+          streamUrl = target.iframeSrc || target.url || target.link || target.stream || target.file || target.source || target.src;
+          if (!streamUrl) {
+            streamUrl = `https://helixpull-cricket.gauravpandey4916.workers.dev/?id=${target.id || identifier}`;
+          }
+        }
 
-    // Override specifically for Sony Liv to use the BoxCast link
-    if (title.includes('sony')) {
-      streamUrl = "https://play.boxcast.com/p/psnzgzfg4vgkvej2elbb/v/all-byteranges-ext.m3u8?Expires=1789591552&Signature=cuW1HK7EVNhLVHrgt0ExuR~EVs1PmVnCZnaPrXKN4rBPMqaIiMNpDGdM-fxzTTohO2uU-IUYzxRt5uumDWPhHiX~HrEOggXrvLP2RqToQ~9N4yYegn1uFG5L~P4OIw7G4RkvyYAaRjId~m-GAwerwxSEGpeJoN7OUQrTzeWyi-xsB9N~ljzEQT4GNm9hF~IIP-FpdOUmlb8lON~YCXmKjwsGuMIR2RI0o97XEbCBW3Emz2eNZubVx6axtJePHZVQvoGZefzHsJRLjcbdnS0X~ac6r4W~sbn4AGRPrjfowW7nPPKMtNLeOXwrrOQF8my5vNuXJHLLpaV02Ohyh8ZWAg__&Key-Pair-Id=APKAJ7GUCBQUK6NTWZCA";
-    } else {
-      // Fallback to your original logic for Fancode and other channels
-      streamUrl = target.iframeSrc || target.url || target.link || target.stream || target.file || target.source || target.src;
-      if (!streamUrl) {
-        streamUrl = `https://helixpull-cricket.gauravpandey4916.workers.dev/?id=${target.id || identifier}`;
-      }
-    }
+        const customNames = { 0: "Fancode", 1: "Sony Liv" };
+        const displayTitle = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
+        this.currentStreamId = identifier;
 
-    // Pass streamUrl to your player initialization logic here
-    console.log("Playing stream:", streamUrl);
-  }
-        
+        this.shadow.querySelector('#activeStreamTitleDisplay').innerText = displayTitle;
+        this.shadow.querySelector('#player').src = streamUrl;
+
+        this.shadow.querySelector('#home-view').classList.remove('active');
+        this.shadow.querySelector('#player-view').classList.add('active');
+
         const query = `?id=${identifier}`;
         if (window.location.search !== query) {
           history.pushState({ playerOpen: true, id: identifier }, '', query);
         }
         window.scrollTo(0, 0);
       }
+        
+        
+        const query = `?id=${identifier}`;
+        if (window.location.search !== query) {
+          history.pushState({ playerOpen: true, id: identifier 
 
       closePlayer() {
         this.shadow.querySelector('#player').src = 'about:blank';
