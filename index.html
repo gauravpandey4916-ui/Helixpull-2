@@ -694,7 +694,7 @@
 
         // Assign custom display titles for web view
         const customNames = {
-          0: "Fancode",
+          0: "Sony Sports",
           1: "Sony Liv"
         };
 
@@ -707,7 +707,7 @@
           const poster = channel.poster || channel.image || channel.logo || channel.img || '';
 
           // Sony Network Icon and Tag Styling
-            let tagText = "Fancode";
+            let tagText = "Sony";
           let badgeIcon = `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h18v8zM6 10h2v4H6z"/></svg>`;
 
           const card = document.createElement('div');
@@ -741,7 +741,7 @@
           streamUrl = `https://helixpull-cricket.gauravpandey4916.workers.dev/?id=${target.id || identifier}`;
         }
 
-        const customNames = { 0: "Fancode", 1: "Sony Liv" };
+        const customNames = { 0: "Sony Sports", 1: "Sony Liv" };
         const displayTitle = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
         this.currentStreamId = identifier;
 
