@@ -674,7 +674,7 @@
           // Filter to find channels matching "Star Sports Hindi" and keep only the first two
           const filteredChannels = rawChannels.filter(channel => {
             const title = (channel.title || channel.name || channel.channel || '').toLowerCase();
-            return title.includes('star sports hindi');
+            return title.includes('Hindi - India vs Japan Asian games');
           });
 
           this.masterChannels = filteredChannels.slice(0, 2);
