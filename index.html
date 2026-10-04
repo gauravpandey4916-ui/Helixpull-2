@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HelixPull Live Sports Hub</title>
+    <!-- Include HLS.js for direct stream playback -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Manrope:wght@400;600;700;800;900&family=Space+Grotesk:wght@500;700;800;900&family=Space+Mono:wght@700&family=Syne:wght@700;800;900&display=swap" rel="stylesheet">
@@ -22,7 +24,6 @@
     <helixpull-ui></helixpull-ui>
 
     <script>
-    // Configuration object
     window.HelixConfig = {
       sourceUrl: "https://helixpull-cricket.gauravpandey4916.workers.dev/"
     };
@@ -33,15 +34,14 @@
         this.shadow = this.attachShadow({ mode: 'open' });
         this.masterChannels = [];
         this.currentStreamId = null;
+        this.hlsInstance = null; // Track HLS instance
         this.stars = [];
         this.animationFrameId = null;
-        this.currentParticleRgb = '0, 255, 204'; // Default Cyan Particles
+        this.currentParticleRgb = '0, 255, 204';
 
         this.shadow.innerHTML =`
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@700&family=Syne:wght@800&display=swap');
-
-            /* BASE THEME SETUP */
             :host {
               --primary-rgb: 0, 255, 204;
               --accent: #00ffcc;
@@ -53,7 +53,6 @@
               --heading-dynamic: #ffffff;
               --text-main: #e2e8f0;
               --text-muted: #64748b;
-              --text-dark: #475569;
               --btn-main-bg: #00ffcc;
               --btn-main-text: #05070a;
               display: block;
@@ -61,8 +60,6 @@
               background-color: var(--bg-pure);
               color: var(--text-main);
             }
-
-            /* GOLD THEME (REPLACES LIGHT/CERAMIC) */
             :host([data-theme="gold"]) {
               --primary-rgb: 255, 215, 0;
               --accent: #ffd700;
@@ -71,486 +68,114 @@
               --bg-card: rgba(22, 19, 13, 0.8);
               --border-glass: rgba(255, 215, 0, 0.15);
               --border-glass-bright: rgba(255, 215, 0, 0.4);
-              --heading-dynamic: #ffffff;
-              --text-main: #f3f0e6;
-              --text-muted: #8c826b;
-              --text-dark: #5c5545;
               --btn-main-bg: #ffd700;
               --btn-main-text: #080705;
             }
-
             * { box-sizing: border-box; }
+            .boot { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; flex-direction: column; justify-content: space-between; padding: 40px; color: #fff; transition: opacity 0.5s ease, visibility 0.5s ease; }
+            .boot.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+            .boot-header { display: flex; justify-content: space-between; color: #64748b; font-weight: 700; letter-spacing: 3px; }
+            .boot-center { display: flex; align-items: center; gap: 20px; }
+            .boot-logo-wrap { width: 80px; height: 80px; border-radius: 20px; background: rgba(var(--primary-rgb), 0.3); box-shadow: 0 0 35px var(--accent-glow); }
+            .boot-logo-wrap img { width: 100%; height: 100%; border-radius: 18px; object-fit: cover; }
+            .boot-title { font-size: 48px; font-weight: 900; }
+            .boot-bar { width: 100%; height: 4px; background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+            .boot-fill { height: 100%; width: 0%; background: var(--accent); box-shadow: 0 0 14px var(--accent); transition: width 0.1s linear; }
+            .boot-status { display: flex; justify-content: space-between; font-weight: 800; font-size: 14px; }
+            
+            .f1-modal-overlay { position: fixed; inset: 0; z-index: 1500; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; }
+            .f1-modal-overlay.open { opacity: 1; visibility: visible; }
+            .f1-card { background: var(--bg-card); border: 1px solid var(--border-glass-bright); border-radius: 24px; padding: 40px; max-width: 440px; width: 90%; text-align: center; }
+            .f1-avatar-wrap img { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--accent); }
+            .f1-title { font-size: 24px; color: var(--heading-dynamic); margin: 10px 0; }
+            .f1-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 25px; }
+            .f1-text-btn { background: var(--btn-main-bg); color: var(--btn-main-text); border: none; padding: 12px 28px; border-radius: 30px; font-weight: 700; cursor: pointer; }
 
-            /* BOOT SCREEN STYLES (MATCHED LANDSCAPE GLOW DESIGN) */
-            .boot {
-              position: fixed;
-              inset: 0;
-              z-index: 2000;
-              background: #000000;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              padding: clamp(20px, 4vw, 40px) clamp(24px, 5vw, 60px);
-              font-family: system-ui, -apple-system, sans-serif;
-              color: #ffffff;
-              transition: opacity 0.5s ease, visibility 0.5s ease;
-            }
-            .boot.hide {
-              opacity: 0;
-              visibility: hidden;
-              pointer-events: none;
-            }
-            .boot-header {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              font-size: clamp(12px, 1.5vw, 16px);
-              font-weight: 700;
-              letter-spacing: 3px;
-              color: #64748b;
-              text-transform: uppercase;
-            }
-            .boot-time {
-              font-family: monospace;
-              letter-spacing: 2px;
-              color: #94a3b8;
-            }
-            .boot-center {
-              display: flex;
-              align-items: center;
-              justify-content: flex-start;
-              gap: clamp(16px, 3vw, 28px);
-              width: 100%;
-              max-width: 1200px;
-              margin: 0 auto;
-              padding-left: clamp(10px, 2vw, 30px);
-            }
-            .boot-logo-wrap {
-              width: clamp(60px, 8vw, 90px);
-              height: clamp(60px, 8vw, 90px);
-              border-radius: 20px;
-              padding: 2px;
-              background: rgba(var(--primary-rgb), 0.3);
-              box-shadow: 0 0 35px var(--accent-glow), 0 0 15px var(--accent-glow);
-              flex-shrink: 0;
-            }
-            .boot-logo-wrap img {
-              width: 100%;
-              height: 100%;
-              border-radius: 18px;
-              object-fit: cover;
-            }
-            .boot-title {
-              font-size: clamp(32px, 5vw, 56px);
-              font-weight: 900;
-              letter-spacing: 1px;
-              text-transform: uppercase;
-              color: #ffffff;
-            }
-            .boot-footer {
-              width: 100%;
-              max-width: 100%;
-              margin: 0 auto;
-            }
-            .boot-bar {
-              width: 100%;
-              height: 4px;
-              background: rgba(255, 255, 255, 0.12);
-              border-radius: 2px;
-              overflow: hidden;
-              margin-bottom: 16px;
-            }
-            .boot-fill {
-              height: 100%;
-              width: 0%;
-              background: var(--accent);
-              box-shadow: 0 0 14px var(--accent), 0 0 6px var(--accent);
-              transition: width 0.1s linear;
-            }
-            .boot-status {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              font-size: clamp(11px, 1.2vw, 14px);
-              font-weight: 800;
-              letter-spacing: 2px;
-              text-transform: uppercase;
-            }
-            .boot-label { color: #64748b; }
-            .boot-percent {
-              color: var(--accent);
-              font-family: monospace;
-            }
-
-            /* WELCOME GATE MODAL */
-            .f1-modal-overlay {
-              position: fixed;
-              inset: 0;
-              z-index: 1500;
-              background: rgba(0, 0, 0, 0.85);
-              backdrop-filter: blur(8px);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              opacity: 0;
-              visibility: hidden;
-              transition: all 0.3s ease;
-            }
-            .f1-modal-overlay.open {
-              opacity: 1;
-              visibility: visible;
-            }
-            .f1-card {
-              background: var(--bg-card);
-              border: 1px solid var(--border-glass-bright);
-              border-radius: 24px;
-              padding: 40px;
-              max-width: 440px;
-              width: 90%;
-              text-align: center;
-              box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-            }
-            .f1-avatar-wrap img {
-              width: 80px;
-              height: 80px;
-              border-radius: 50%;
-              border: 2px solid var(--accent);
-            }
-            .f1-eyebrow {
-              font-size: 12px;
-              letter-spacing: 2px;
-              color: var(--accent);
-              margin-top: 15px;
-            }
-            .f1-title {
-              font-size: 24px;
-              color: var(--heading-dynamic);
-              margin: 10px 0;
-            }
-            .f1-sub {
-              font-size: 14px;
-              color: var(--text-muted);
-              margin-bottom: 25px;
-            }
-            .f1-text-btn {
-              background: var(--btn-main-bg);
-              color: var(--btn-main-text);
-              border: none;
-              padding: 12px 28px;
-              border-radius: 30px;
-              font-weight: 700;
-              cursor: pointer;
-              transition: transform 0.2s ease;
-            }
-            .f1-text-btn:hover { transform: scale(1.05); }
-
-            /* BACKGROUND CANVAS */
-            #warpGridCanvas {
-              position: fixed;
-              top: 0;
-              left: 0;
-              width: 100vw;
-              height: 100vh;
-              z-index: 0;
-              pointer-events: none;
-            }
-
-            /* CONTAINER & VIEWS */
-            .container {
-              position: relative;
-              z-index: 1;
-              max-width: 1200px;
-              margin: 0 auto;
-              padding: 20px;
-              overflow-x : hidden;
-            }
-            .nav {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 15px 0;
-            }
-            .brand-title {
-              font-size: 24px;
-              font-weight: 900;
-              letter-spacing: 1px;
-              color: var(--heading-dynamic);
-              cursor: pointer;
-              .brand-sub {
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;            /* Reduced font size */
-  font-weight: 700;
-  color: var(--accent);
-  letter-spacing: 1.5px;
-  text-transform: uppercase; /* Ensures all letters render in CAPITAL */
-  margin-top: 2px;
-  opacity: 0.9;
-}
-
-            }
-            .live-pill-badge {
-              background: rgba(239, 68, 68, 0.15);
-              color: #ef4444;
-              border: 1px solid rgba(239, 68, 68, 0.3);
-              padding: 6px 14px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: 700;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            }
-            .pulsing-live-dot {
-              width: 8px;
-              height: 8px;
-              background: #ef4444;
-              border-radius: 50%;
-              box-shadow: 0 0 8px #ef4444;
-            }
+            #warpGridCanvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none; }
+            .container { position: relative; z-index: 1; max-width: 1200px; margin: 0 auto; padding: 20px; }
+            .nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; }
+            .brand-title { font-size: 24px; font-weight: 900; color: #fff; cursor: pointer; }
+            .brand-sub { font-family: 'Space Mono', monospace; font-size: 9px; color: var(--accent); letter-spacing: 1.5px; text-transform: uppercase; }
+            .live-pill-badge { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+            .pulsing-live-dot { width: 8px; height: 8px; background: #ef4444; border-radius: 50%; box-shadow: 0 0 8px #ef4444; }
+            
             .view-section { display: none; }
             .view-section.active { display: block; }
-
+            
             .hero { margin: 40px 0 20px 0; }
-            .hero-tag { 
-              color: var(--accent); 
-              font-size: 12px; 
-              letter-spacing: 2px; 
-              font-weight: 700; 
-              font-family: 'Space Mono', monospace;
-              text-transform: uppercase;
-            }
-            .hero-headline { 
-              font-family: 'Syne', system-ui, sans-serif;
-              font-size: clamp(26px, 7vw, 54px); 
-              font-weight: 800; 
-              text-transform: uppercase;
-              letter-spacing: -0.5px;
-              line-height: 1; 
-              margin: 10px 0; 
-              color: var(--heading-dynamic);
-              word-break: break-word;
-              overflow-wrap: break-word;
-              }
-            }
-            .hero-headline .accent-txt { color: var(--accent); }
-            .hero-details { 
-              font-family: 'Space Mono', monospace;
-              font-size: 13px; 
-              color: var(--text-muted); 
-              letter-spacing: 1px; 
-              text-transform: uppercase;
-            }
-            .meta-separator { margin: 0 10px; opacity: 0.3; }
-            .track-separator-beam { height: 1px; background: linear-gradient(90deg, transparent, var(--border-glass-bright), transparent); margin: 30px 0; }
-
-            /* CHANNELS GRID */
-            .channels-grid {
-              display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-              gap: 24px;
-            }
-            .channel-card {
-              background: var(--bg-card);
-              border: 1px solid var(--border-glass);
-              border-radius: 16px;
-              overflow: hidden;
-              cursor: pointer;
-              transition: all 0.3s ease;
-            }
-            .channel-card:hover {
-              transform: translateY(-5px);
-              border-color: var(--border-glass-bright);
-              box-shadow: 0 10px 30px var(--accent-glow);
-            }
-            .card-thumbnail {
-              height: 160px;
-              background: rgba(0,0,0,0.4);
-              position: relative;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              background-size: cover;
-              background-position: center;
-            }
-            .channel-badge-box svg { width: 36px; height: 36px; fill: var(--accent); }
-            .card-network-tag { font-size: 12px; letter-spacing: 2px; color: var(--accent); font-weight: 700; margin-top: 8px; }
-            .play-overlay-icon {
-              position: absolute;
-              inset: 0;
-              background: rgba(0,0,0,0.4);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              opacity: 0;
-              transition: opacity 0.2s ease;
-            }
-            .play-overlay-icon svg { width: 44px; height: 44px; fill: #ffffff; }
+            .hero-tag { color: var(--accent); font-size: 12px; letter-spacing: 2px; font-weight: 700; font-family: 'Space Mono', monospace; }
+            .hero-headline { font-size: clamp(26px, 7vw, 54px); font-weight: 800; text-transform: uppercase; margin: 10px 0; }
+            .accent-txt { color: var(--accent); }
+            
+            .channels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px; }
+            .channel-card { background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 16px; overflow: hidden; cursor: pointer; transition: all 0.3s ease; }
+            .channel-card:hover { transform: translateY(-5px); border-color: var(--border-glass-bright); box-shadow: 0 10px 30px var(--accent-glow); }
+            .card-thumbnail { height: 160px; background: rgba(0,0,0,0.4); position: relative; display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; }
+            .play-overlay-icon { position: absolute; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s ease; }
+            .play-overlay-icon svg { width: 44px; height: 44px; fill: #fff; }
             .channel-card:hover .play-overlay-icon { opacity: 1; }
             .card-body { padding: 18px; }
-            .card-title { font-size: 18px; font-weight: 700; color: var(--heading-dynamic); margin-bottom: 8px; }
-            .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-muted); font-weight: 600; }
+            .card-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+            .card-meta { display: flex; justify-content: space-between; font-size: 12px; color: #64748b; font-weight: 600; }
 
-            /* PLAYER VIEW */
             .player-top-nav { margin-bottom: 20px; }
-            .back-home-btn {
-              background: transparent;
-              border: 1px solid var(--border-glass);
-              color: var(--text-main);
-              padding: 10px 20px;
-              border-radius: 20px;
-              cursor: pointer;
-              transition: background 0.2s;
-            }
-            .back-home-btn:hover { background: var(--border-glass); }
-            .player-rig-box {
-              position: relative;
-              width: 100%;
-              padding-top: 56.25%;
-              background: #000;
-              border-radius: 16px;
-              overflow: hidden;
-              border: 1px solid var(--border-glass);
-            }
-            .player-rig-box iframe {
-              position: absolute;
-              top: 0; left: 0; width: 100%; height: 100%;
-              border: none;
-            }
-            .blended-fs-btn {
-              position: absolute;
-              bottom: 15px; right: 15px;
-              background: rgba(0,0,0,0.6);
-              border: 1px solid rgba(255,255,255,0.2);
-              border-radius: 8px;
-              width: 36px; height: 36px;
-              display: flex; align-items: center; justify-content: center;
-              cursor: pointer;
-              fill: #fff;
-            }
-            .blended-fs-btn svg { width: 20px; height: 20px; }
-            .player-meta-bar {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-top: 20px;
-            }
-            .stream-title-group strong { display: block; font-size: 20px; color: var(--heading-dynamic); }
-            .stream-title-group span { font-size: 13px; color: var(--text-muted); }
-            .share-action-btn {
-              background: var(--bg-card);
-              border: 1px solid var(--border-glass);
-              color: var(--text-main);
-              padding: 10px 18px;
-              border-radius: 12px;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              gap: 8px;
-            }
+            .back-home-btn { background: transparent; border: 1px solid var(--border-glass); color: #fff; padding: 10px 20px; border-radius: 20px; cursor: pointer; }
+            
+            /* Replaced iframe rig box with standard HTML5 video player container */
+            .player-rig-box { position: relative; width: 100%; padding-top: 56.25%; background: #000; border-radius: 16px; overflow: hidden; border: 1px solid var(--border-glass); }
+            .player-rig-box video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain; }
 
-            /* THEME SWITCHER */
-            .theme-switch-deck {
-              position: fixed;
-              bottom: 24px; right: 24px;
-              z-index: 100;
-              background: var(--bg-card);
-              border: 1px solid var(--border-glass);
-              border-radius: 30px;
-              padding: 4px;
-              display: flex;
-              gap: 4px;
-              backdrop-filter: blur(10px);
-            }
-            .theme-switch-deck.hidden { display: none; }
-            .mode-toggle-btn {
-              background: transparent;
-              border: none;
-              color: var(--text-muted);
-              padding: 8px 16px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: 700;
-              cursor: pointer;
-            }
-            .mode-toggle-btn.active {
-              background: var(--btn-main-bg);
-              color: var(--btn-main-text);
-              @media (max-width:480px)
-              {.hero-headline { font-size : 26px; letter-spacing: 0.5px;}
-              .hero-details { font-size : 10px; letter-spacing : 0px; } 
-              . f1-card { padding: 24px 16px; } 
-              . theme-switch-deck { bottom : 16px; right : 16px:} 
-            }
+            .player-meta-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+            .stream-title-group strong { display: block; font-size: 20px; color: #fff; }
+            .stream-title-group span { font-size: 13px; color: #64748b; }
+            
+            .theme-switch-deck { position: fixed; bottom: 24px; right: 24px; z-index: 100; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 30px; padding: 4px; display: flex; gap: 4px; }
+            .mode-toggle-btn { background: transparent; border: none; color: #64748b; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer; }
+            .mode-toggle-btn.active { background: var(--btn-main-bg); color: var(--btn-main-text); }
           </style>
 
-          <!-- BOOT SCREEN -->
           <div class="boot" id="boot">
               <div class="boot-header">
                   <div>HELIXPULL / STREAMING WEB</div>
                   <div class="boot-time" id="bootTime">00:00</div>
               </div>
-
               <div class="boot-center">
-                  <div class="boot-logo-wrap">
-                      <img src="https://files.catbox.moe/0ghrsb.jpg" alt="HELIXPULL Logo">
-                  </div>
+                  <div class="boot-logo-wrap"><img src="https://files.catbox.moe/0ghrsb.jpg"></div>
                   <div class="boot-title">HELIXPULL</div>
               </div>
-
               <div class="boot-footer">
-                  <div class="boot-bar">
-                      <div class="boot-fill" id="bootFill"></div>
-                  </div>
-                  <div class="boot-status">
-                      <span class="boot-label" id="bootStatus">INITIALIZING SIGNAL</span>
-                      <span class="boot-percent" id="bootPercent">0%</span>
-                  </div>
+                  <div class="boot-bar"><div class="boot-fill" id="bootFill"></div></div>
+                  <div class="boot-status"><span id="bootStatus">INITIALIZING SIGNAL</span><span id="bootPercent">0%</span></div>
               </div>
           </div>
 
-          <!-- WELCOME GATE MODAL -->
           <div class="f1-modal-overlay" id="welcomeGate">
               <div class="f1-card">
-                  <div class="f1-avatar-wrap">
-                      <img src="https://files.catbox.moe/0ghrsb.jpg" alt="HELIXPULL">
-                  </div>
-                  <div class="f1-eyebrow">OFFICIAL HELIXPULL</div>
+                  <div class="f1-avatar-wrap"><img src="https://files.catbox.moe/0ghrsb.jpg"></div>
                   <h2 class="f1-title">The match starts here.</h2>
-                  <p class="f1-sub">Welcome to the official HelixPull live streaming portal</p>
+                  <p class="f1-sub">Welcome to HelixPull IPTV Hub</p>
                   <button class="f1-text-btn" id="dismissWelcomeBtn">LET'S WATCH</button>
               </div>
           </div>
 
           <canvas id="warpGridCanvas"></canvas>
 
-          <div class="container" id="mainContainer">
+          <div class="container">
             <header class="nav">
               <a class="brand" id="brandHomeLink">
                 <div class="brand-title">HelixPull</div>
                 <div class="brand-sub">By Gaurav</div>
               </a>
-              <div class="nav-actions">
-                <div class="live-pill-badge"><i class="pulsing-live-dot"></i>ON AIR</div>
-              </div>
+              <div class="live-pill-badge"><i class="pulsing-live-dot"></i>ON AIR</div>
             </header>
 
             <div id="home-view" class="view-section active">
               <section class="hero">
                 <div class="hero-tag">LIVE BROADCASTS</div>
                 <h1 class="hero-headline">SPORTS <br><span class="accent-txt">CHANNELS.</span></h1>
-                <div class="hero-details">
-                  <b>MASTER DATABASE</b><span class="meta-separator"></span>ALL CHANNELS LIVE<span class="meta-separator"></span>SELECT TO WATCH
-                </div>
               </section>
-
-              <div class="track-separator-beam"></div>
-
               <div id="channels-grid" class="channels-grid">
-                <div class="state-container">
-                  <div class="spinner"></div>
-                  <p>Fetching professional sports feed...</p>
-                </div>
+                <div>Loading Channels...</div>
               </div>
             </div>
 
@@ -558,30 +183,22 @@
               <div class="player-top-nav">
                 <button class="back-home-btn" id="backHomeBtn">&#8592; Back to Channels</button>
               </div>
-
               <div class="player-rig-box" id="playerContainer">
-                <iframe id="player" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen="true"></iframe>
-                <button class="blended-fs-btn" id="blendedFsBtn" title="Toggle Fullscreen">
-                  <svg id="fsIconSvg" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
-                </button>
-              </div 
-                            </div>
+                <!-- HTML5 video element powered by HLS.js -->
+                <video id="nativePlayer" controls autoplay playsinline></video>
+              </div>
               <div class="player-meta-bar">
                 <div class="stream-title-group">
                   <strong id="activeStreamTitleDisplay">Live Broadcast</strong>
                   <span>HelixPull High-Definition Stream</span>
                 </div>
-                <button class="share-action-btn" id="btnShare">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg>
-                  <span id="shareBtnText">SHARE STREAM</span>
-                </button>
               </div>
             </div>
           </div>
 
           <aside class="theme-switch-deck" id="themeSwitchDeck">
-            <button class="mode-toggle-btn active" id="themeDarkBtn"><i></i> Obsidian</button>
-            <button class="mode-toggle-btn" id="themeGoldBtn"><i></i> Gold</button>
+            <button class="mode-toggle-btn active" id="themeDarkBtn">Obsidian</button>
+            <button class="mode-toggle-btn" id="themeGoldBtn">Gold</button>
           </aside>
         `;
       }
@@ -589,61 +206,24 @@
       connectedCallback() {
         this.initWarpField();
         this.initEventListeners();
-        this.setupMessageListener();
         this.fetchChannels();
-        this.handleUrlRouting();
         this.startBootSequence();
       }
 
-      disconnectedCallback() {
-        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-      }
-
-      updateBootTime() {
-        const now = new Date();
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        const timeEl = this.shadow.querySelector('#bootTime');
-        if (timeEl) timeEl.textContent = `${hours}:${minutes}`;
-      }
-
       startBootSequence() {
-        this.updateBootTime();
         const fill = this.shadow.querySelector('#bootFill');
         const percent = this.shadow.querySelector('#bootPercent');
-        const status = this.shadow.querySelector('#bootStatus');
-        
         let progress = 0;
         const interval = setInterval(() => {
-          progress += Math.floor(Math.random() * 15) + 5;
-          
+          progress += 20;
+          fill.style.width = progress + '%';
+          percent.textContent = progress + '%';
           if (progress >= 100) {
-            progress = 100;
             clearInterval(interval);
-            
-            fill.style.width = "100%";
-            percent.textContent = "100%";
-            status.textContent = "READY";
-            
-            setTimeout(() => {
-              this.finishBoot();
-            }, 300);
-          } else {
-            fill.style.width = progress + "%";
-            percent.textContent = progress + "%";
+            setTimeout(() => this.shadow.querySelector('#boot').classList.add('hide'), 300);
+            setTimeout(() => this.shadow.querySelector('#welcomeGate').classList.add('open'), 500);
           }
-        }, 120);
-      }
-
-      finishBoot() {
-        this.shadow.querySelector('#boot').classList.add('hide');
-
-        const params = new URLSearchParams(window.location.search);
-        if (!params.get('id')) {
-          setTimeout(() => {
-            this.shadow.querySelector('#welcomeGate').classList.add('open');
-          }, 250);
-        }
+        }, 100);
       }
 
       dismissWelcome() {
@@ -651,38 +231,24 @@
       }
 
       async fetchChannels() {
-        const grid = this.shadow.querySelector('#channels-grid');
-        let data = null;
+        // Manually injecting your Fox Sports 501 4K stream along with any configuration channels
+        this.masterChannels = [
+          {
+            id: "5209",
+            title: "FOX SPORTS 501 4K",
+            url: "https://streamunlimitedportal.gojo45749.workers.dev?portal=http%3A%2F%2Fsmart4k.me%2F&mac=00%3A1A%3A79%3A00%3A04%3AD9&id=5209",
+            logo: "https://streamunlimitedportal.gojo45749.workers.dev?portal=http%3A%2F%2Fsmart4k.me%2F&mac=00%3A1A%3A79%3A00%3A04%3AD9&logo=5125.png"
+          }
+        ];
 
+        // You can also merge fetched channels if your worker database contains it:
         try {
           const res = await fetch(window.HelixConfig.sourceUrl);
-          data = await res.json();
-        } catch (err) {
-          console.warn("Direct fetch failed, attempting proxy fallback...", err);
-          try {
-            const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(window.HelixConfig.sourceUrl);
-            const res = await fetch(proxyUrl);
-            data = await res.json();
-          } catch (proxyErr) {
-            console.error("CORS proxy fetch failed:", proxyErr);
-          }
-        }
-
-        if (data) {
-          const rawChannels = Array.isArray(data) ? data : (data.iframes || data.channels || data.streams || data.data || []);
-          
-          // Filter to find channels matching "Star Sports Hindi" and keep only the first two
-          const filteredChannels = rawChannels.filter(channel => {
-            const title = (channel.title || channel.name || channel.channel || '').toLowerCase();
-            return title.includes('star sports hindi');
-          });
-
-          this.masterChannels = filteredChannels.slice(0, 2);
-        }
-
-        if (!this.masterChannels || this.masterChannels.length === 0) {
-          grid.innerHTML = '<div class="state-container" style="color:#ef4444;">No channels found.</div>';
-          return;
+          const data = await res.json();
+          const remoteChannels = Array.isArray(data) ? data : (data.channels || data.streams || []);
+          this.masterChannels = [...this.masterChannels, ...remoteChannels];
+        } catch (e) {
+          console.log("Using local default fallback channel list");
         }
 
         this.renderGrid();
@@ -692,166 +258,94 @@
         const grid = this.shadow.querySelector('#channels-grid');
         grid.innerHTML = '';
 
-        // Assign custom display titles for web view
-        const customNames = {
-          0: "Sony Sports",
-          1: "Sony Liv"
-        };
-
         this.masterChannels.forEach((channel, index) => {
-          const channelId = channel.id !== undefined ? channel.id : index;
-          
-          const rawTitle = channel.title || channel.name || channel.channel || `Channel ${index + 1}`;
-          const title = customNames[index] || rawTitle;
-
-          const poster = channel.poster || channel.image || channel.logo || channel.img || '';
-
-          // Sony Network Icon and Tag Styling
-            let tagText = "Cricket";
-          let badgeIcon = `<svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 10H3V8h18v8zM6 10h2v4H6z"/></svg>`;
+          const channelId = channel.id || index;
+          const title = channel.title || channel.name || "Live Channel";
+          const poster = channel.logo || channel.poster || '';
 
           const card = document.createElement('div');
           card.className = 'channel-card';
-          card.onclick = () => this.openPlayer(channelId);
-
-          let thumbHtml = poster 
-            ? `<div class="card-thumbnail" style="background-image: url('${poster}')"><div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div>`
-            : `<div class="card-thumbnail">
-                 <div class="channel-badge-box">${badgeIcon}</div>
-                 <span class="card-network-tag">${tagText}</span>
-                 <div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-               </div>`;
+          card.onclick = () => this.openPlayer(channelId, channel.url);
 
           card.innerHTML = `
-            ${thumbHtml}
+            <div class="card-thumbnail" style="background-image: url('${poster}')">
+              <div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            </div>
             <div class="card-body">
               <div class="card-title">${title}</div>
-              <div class="card-meta"><span>HD FEED</span><span style="color:var(--accent);">WATCH NOW</span></div>
+              <div class="card-meta"><span>4K UHD FEED</span><span style="color:var(--accent);">WATCH NOW</span></div>
             </div>
           `;
           grid.appendChild(card);
         });
       }
-            openPlayer(identifier) {
-        const target = this.masterChannels.find((ch, idx) => (ch.id == identifier) || (idx == identifier));
-        if (!target) return;
 
-        let streamUrl = target.iframeSrc || target.url || target.link || target.stream || target.file || target.source || target.src;
-        if (!streamUrl) {
-          streamUrl = `https://helixpull-cricket.gauravpandey4916.workers.dev/?id=${target.id || identifier}`;
-        }
-
-        const customNames = { 0: "Stream 1", 1: "Stream 2" };
-        const displayTitle = customNames[identifier] || target.title || target.name || target.channel || "Live Broadcast";
-        this.currentStreamId = identifier;
+      openPlayer(identifier, directUrl) {
+        const target = this.masterChannels.find(ch => (ch.id == identifier) || (ch.url == directUrl));
+        const streamUrl = directUrl || target?.url;
+        const displayTitle = target?.title || "Fox Sports 501 4K";
 
         this.shadow.querySelector('#activeStreamTitleDisplay').innerText = displayTitle;
-        this.shadow.querySelector('#player').src = streamUrl;
-
+        
         this.shadow.querySelector('#home-view').classList.remove('active');
         this.shadow.querySelector('#player-view').classList.add('active');
 
-        const query = `?id=${identifier}`;
-        if (window.location.search !== query) {
-          history.pushState({ playerOpen: true, id: identifier }, '', query);
-        }
-        window.scrollTo(0, 0);
-            }
-        
-        
-      closePlayer() {
-        this.shadow.querySelector('#player').src = 'about:blank';
+        const videoElement = this.shadow.querySelector('#nativePlayer');
 
-        try { if (document.fullscreenElement) document.exitFullscreen().catch(()=>{}); } catch(err){}
-        this.shadow.querySelector('#playerContainer').classList.remove('fs-active');
-        this.shadow.querySelector('#themeSwitchDeck').classList.remove('hidden');
+        // Clean up previous HLS instance if any
+        if (this.hlsInstance) {
+          this.hlsInstance.destroy();
+          this.hlsInstance = null;
+        }
+
+        // Initialize HLS.js player for Stalker proxy stream
+        if (Hls.isSupported()) {
+          this.hlsInstance = new Hls();
+          this.hlsInstance.loadSource(streamUrl);
+          this.hlsInstance.attachMedia(videoElement);
+          this.hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+            videoElement.play().catch(e => console.log("Autoplay blocked:", e));
+          });
+        } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
+          // Native Safari / iOS support
+          videoElement.src = streamUrl;
+          videoElement.addEventListener('loadedmetadata', () => {
+            videoElement.play();
+          });
+        }
+
+        window.scrollTo(0, 0);
+      }
+
+      closePlayer() {
+        const videoElement = this.shadow.querySelector('#nativePlayer');
+        videoElement.pause();
+        videoElement.src = '';
+
+        if (this.hlsInstance) {
+          this.hlsInstance.destroy();
+          this.hlsInstance = null;
+        }
 
         this.shadow.querySelector('#player-view').classList.remove('active');
         this.shadow.querySelector('#home-view').classList.add('active');
-        this.currentStreamId = null;
-
-        if (window.location.search !== '') {
-          history.pushState({}, '', window.location.pathname);
-        }
-      }
-
-      handleUrlRouting() {
-        const params = new URLSearchParams(window.location.search);
-        const id = params.get('id');
-        if (id !== null && this.masterChannels.length > 0) {
-          this.openPlayer(id);
-        }
-      }
-
-      toggleFullscreen() {
-        const rig = this.shadow.querySelector('#playerContainer');
-        const themeDeck = this.shadow.querySelector('#themeSwitchDeck');
-        const fsIconSvg = this.shadow.querySelector('#fsIconSvg');
-        if (!rig) return;
-
-        const isFull = document.fullscreenElement || rig.classList.contains('fs-active');
-        if (!isFull) {
-          rig.classList.add('fs-active');
-          if (themeDeck) themeDeck.classList.add('hidden');
-          if (fsIconSvg) fsIconSvg.innerHTML = '<path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>';
-          try { if (rig.requestFullscreen) rig.requestFullscreen().catch(()=>{}); } catch(err){}
-        } else {
-          rig.classList.remove('fs-active');
-          if (themeDeck) themeDeck.classList.remove('hidden');
-          if (fsIconSvg) fsIconSvg.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
-          try { if (document.exitFullscreen) document.exitFullscreen().catch(()=>{}); } catch(err){}
-        }
-      }
-
-      setupMessageListener() {
-        document.addEventListener('fullscreenchange', () => {
-          const rig = this.shadow.querySelector('#playerContainer');
-          const themeDeck = this.shadow.querySelector('#themeSwitchDeck');
-          const fsIconSvg = this.shadow.querySelector('#fsIconSvg');
-
-          if (!document.fullscreenElement && !document.webkitIsFullScreen && rig) {
-            rig.classList.remove('fs-active');
-            if (themeDeck) themeDeck.classList.remove('hidden');
-            if (fsIconSvg) {
-              fsIconSvg.innerHTML = '<path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>';
-            }
-          }
-        });
       }
 
       initEventListeners() {
         this.shadow.querySelector('#backHomeBtn').onclick = () => this.closePlayer();
         this.shadow.querySelector('#brandHomeLink').onclick = () => this.closePlayer();
         this.shadow.querySelector('#dismissWelcomeBtn').onclick = () => this.dismissWelcome();
-        this.shadow.querySelector('#blendedFsBtn').onclick = () => this.toggleFullscreen();
 
-        /* Theme Switches */
         this.shadow.querySelector('#themeDarkBtn').onclick = () => {
           this.removeAttribute('data-theme');
           this.shadow.querySelector('#themeDarkBtn').classList.add('active');
           this.shadow.querySelector('#themeGoldBtn').classList.remove('active');
-          this.currentParticleRgb = '0, 255, 204'; // Cyan particles
         };
 
         this.shadow.querySelector('#themeGoldBtn').onclick = () => {
           this.setAttribute('data-theme', 'gold');
           this.shadow.querySelector('#themeGoldBtn').classList.add('active');
           this.shadow.querySelector('#themeDarkBtn').classList.remove('active');
-          this.currentParticleRgb = '255, 215, 0'; // Gold particles
-        };
-
-        const btnShare = this.shadow.querySelector('#btnShare');
-        const shareText = this.shadow.querySelector('#shareBtnText');
-        btnShare.onclick = async () => {
-          try {
-            if (navigator.share) {
-              await navigator.share({ title: 'HelixPull Live', url: window.location.href });
-            } else {
-              await navigator.clipboard.writeText(window.location.href);
-              shareText.textContent = "COPIED!";
-              setTimeout(() => { shareText.textContent = "SHARE STREAM"; }, 1800);
-            }
-          } catch(err){}
         };
       }
 
@@ -859,11 +353,10 @@
         const canvas = this.shadow.getElementById('warpGridCanvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
-        const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-        window.addEventListener('resize', resize);
-        resize();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-        for (let i = 0; i < 100; i++) {
+        for (let i = 0; i < 60; i++) {
           this.stars.push({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
@@ -875,20 +368,14 @@
 
         const render = () => {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.lineWidth = 1.2;
-          const activeRgb = this.currentParticleRgb || '0, 255, 204';
-
           this.stars.forEach(star => {
-            ctx.strokeStyle = `rgba(${activeRgb}, ${star.alpha})`;
+            ctx.strokeStyle = `rgba(0, 255, 204, ${star.alpha})`;
             ctx.beginPath();
             ctx.moveTo(star.x, star.y);
             ctx.lineTo(star.x + star.length, star.y);
             ctx.stroke();
             star.x += star.speed;
-            if (star.x > canvas.width) {
-              star.x = -star.length;
-              star.y = Math.random() * canvas.height;
-            }
+            if (star.x > canvas.width) star.x = -star.length;
           });
           this.animationFrameId = requestAnimationFrame(render);
         };
