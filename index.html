@@ -535,4 +535,163 @@
             id: "5209",
             title: "FOX SPORTS 501 4K",
             url: "https://streamunlimitedportal.gojo45749.workers.dev?portal=http%3A%2F%2Fsmart4k.me%2F&mac=00%3A1A%3A79%3A00%3A04%3AD9&id=5209",
-            logo: "https://st
+            logo: "https://streamunlimitedportal.gojo45749.workers.dev?portal=http%3A%2F%2Fsmart4k.me%2F&mac=00%3A1A%3A79%3A00%3A04%3AD9&logo=5125.png"
+          }
+        ];
+
+        // Fetch remote configuration channels if available
+        try {
+          const res = await fetch(window.HelixConfig.sourceUrl);
+          const data = await res.json();
+          const remoteChannels = Array.isArray(data) ? data : (data.channels || data.streams || []);
+          this.masterChannels = [...this.masterChannels, ...remoteChannels];
+        } catch (err) {
+          console.warn("Using local primary feed channels.");
+        }
+
+        this.renderGrid();
+      }
+
+      renderGrid() {
+        const grid = this.shadow.querySelector('#channels-grid');
+        grid.innerHTML = '';
+
+        this.masterChannels.forEach((channel, index) => {
+          const channelId = channel.id || index;
+          const title = channel.title || channel.name || `Channel ${index + 1}`;
+          const poster = channel.logo || channel.poster || '';
+
+          const card = document.createElement('div');
+          card.className = 'channel-card';
+          card.onclick = () => this.openPlayer(channelId, channel.url);
+
+          card.innerHTML = `
+            <div class="card-thumbnail" style="background-image: url('${poster}')">
+              <div class="play-overlay-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">${title}</div>
+              <div class="card-meta"><span>4K UHD FEED</span><span style="color:var(--accent);">WATCH NOW</span></div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      }
+
+      openPlayer(identifier, directUrl) {
+        const target = this.masterChannels.find(ch => (ch.id == identifier) || (ch.url == directUrl));
+        const streamUrl = directUrl || target?.url;
+        const displayTitle = target?.title || "FOX SPORTS 501 4K";
+
+        this.shadow.querySelector('#activeStreamTitleDisplay').innerText = displayTitle;
+        
+        this.shadow.querySelector('#home-view').classList.remove('active');
+        this.shadow.querySelector('#player-view').classList.add('active');
+
+        const videoElement = this.shadow.querySelector('#nativePlayer');
+
+        this.cleanupPlayer();
+
+        // Initialize mpegts.js for raw MPEG-TS playback
+        if (mpegts.getFeatureList().mseLivePlayback) {
+          this.mediaPlayer = mpegts.createPlayer({
+            type: 'mpegts',
+            isLive: true,
+            url: streamUrl,
+            cors: true
+          });
+          this.mediaPlayer.attachMediaElement(videoElement);
+          this.mediaPlayer.load();
+          this.mediaPlayer.play().catch(err => console.log("Autoplay restriction:", err));
+        }
+
+        window.scrollTo(0, 0);
+      }
+
+      cleanupPlayer() {
+        if (this.mediaPlayer) {
+          try {
+            this.mediaPlayer.pause();
+            this.mediaPlayer.unload();
+            this.mediaPlayer.detachMediaElement();
+            this.mediaPlayer.destroy();
+          } catch (e) {}
+          this.mediaPlayer = null;
+        }
+        const videoElement = this.shadow.querySelector('#nativePlayer');
+        if (videoElement) {
+          videoElement.pause();
+          videoElement.src = '';
+        }
+      }
+
+      closePlayer() {
+        this.cleanupPlayer();
+        this.shadow.querySelector('#player-view').classList.remove('active');
+        this.shadow.querySelector('#home-view').classList.add('active');
+      }
+
+      initEventListeners() {
+        this.shadow.querySelector('#backHomeBtn').onclick = () => this.closePlayer();
+        this.shadow.querySelector('#brandHomeLink').onclick = () => this.closePlayer();
+        this.shadow.querySelector('#dismissWelcomeBtn').onclick = () => this.dismissWelcome();
+
+        this.shadow.querySelector('#themeDarkBtn').onclick = () => {
+          this.removeAttribute('data-theme');
+          this.shadow.querySelector('#themeDarkBtn').classList.add('active');
+          this.shadow.querySelector('#themeGoldBtn').classList.remove('active');
+          this.currentParticleRgb = '0, 255, 204';
+        };
+
+        this.shadow.querySelector('#themeGoldBtn').onclick = () => {
+          this.setAttribute('data-theme', 'gold');
+          this.shadow.querySelector('#themeGoldBtn').classList.add('active');
+          this.shadow.querySelector('#themeDarkBtn').classList.remove('active');
+          this.currentParticleRgb = '255, 215, 0';
+        };
+      }
+
+      initWarpField() {
+        const canvas = this.shadow.getElementById('warpGridCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+        window.addEventListener('resize', resize);
+        resize();
+
+        for (let i = 0; i < 60; i++) {
+          this.stars.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            length: Math.random() * 20 + 10,
+            speed: Math.random() * 2 + 1,
+            alpha: Math.random() * 0.5 + 0.1
+          });
+        }
+
+        const render = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.lineWidth = 1.2;
+          this.stars.forEach(star => {
+            ctx.strokeStyle = `rgba(${this.currentParticleRgb}, ${star.alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(star.x, star.y);
+            ctx.lineTo(star.x + star.length, star.y);
+            ctx.stroke();
+            star.x += star.speed;
+            if (star.x > canvas.width) {
+              star.x = -star.length;
+              star.y = Math.random() * canvas.height;
+            }
+          });
+          this.animationFrameId = requestAnimationFrame(render);
+        };
+        render();
+      }
+    }
+
+    customElements.define('helixpull-ui', HelixPullUI);
+    </script>
+</body>
+</html>
+
