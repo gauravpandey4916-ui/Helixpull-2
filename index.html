@@ -404,7 +404,7 @@
         const heroChannel = {
             id: "sony3",
             name: "Sony Sports 3 Hindi HD",
-            iframeSrc:"https://ntg-cwd.pages.dev/?id=sony3",
+            iframeSrc:"https://file-to-hls-bot-2.onrender.com/hls/177/playlist.m3u8",
             category: "Sony",
             logourl: "https://iili.io/nw9y074.jpg"
         };
@@ -589,7 +589,6 @@
             try {
                 const response = await fetch('https://sonujson-v5.pages.dev/loura.json');
                 const data = await response.json();
-                const playerUrl = `https://ntg-cwd.pages.dev/${channelId}`;
             
                 let channels = Array.isArray(data) ? data : (data.channels || data.data || []);
                 
