@@ -799,7 +799,7 @@
             const container = document.getElementById('categoryRowsContainer');
             container.innerHTML = '';
 
-            if ((!sportsList || sportsList.length === 0) && (!intlList || intlList.length === 0)) {
+            if ((!sportsList || sportsList.length === 0) || (!intlList || intlList.length === 0)) {
                 container.innerHTML = `<div class="text-center py-12 text-slate-500 text-sm font-medium">No streams found matching your search.</div>`;
                 return;
             }
