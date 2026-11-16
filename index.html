@@ -1,0 +1,1682 @@
+<!--
+  VERCEL DEPLOYMENT NOTE:
+  To support direct path URLs like https://your-domain.vercel.app/Url=https://example.com/stream.m3u8
+  on Vercel without 404s, include a vercel.json file in your project root:
+  {
+    "rewrites": [
+      { "source": "/(.*)", "destination": "/index.html" }
+    ]
+  }
+-->
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Stream Player</title>
+
+  <!-- Crisp Sans-Serif Typography: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'] },
+          colors: {
+            void: '#050507',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Multi-Engine Playback Stack: Shaka Player + HLS.js + mpegts.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.11.2/shaka-player.compiled.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #050507;
+      color: #f8fafc;
+      user-select: none;
+    }
+
+    /* Custom Precision Range Sliders */
+    input[type="range"].cinema-range {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    input[type="range"].cinema-range::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.22);
+    }
+    input[type="range"].cinema-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #ffffff;
+      margin-top: -4px;
+      box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+      transition: transform 0.15s ease;
+    }
+    input[type="range"].cinema-range:hover::-webkit-slider-thumb {
+      transform: scale(1.25);
+    }
+
+    /* Aspect Ratio Modes */
+    .fit-contain { object-fit: contain; width: 100%; height: 100%; }
+    .fit-cover   { object-fit: cover; width: 100%; height: 100%; }
+    .fit-fill    { object-fit: fill; width: 100%; height: 100%; }
+    .fit-16-9    { aspect-ratio: 16 / 9; object-fit: fill; max-width: 100%; max-height: 100%; }
+
+    /* Center Gesture HUD Pop Animation */
+    @keyframes hudPulse {
+      0%   { opacity: 0; transform: scale(0.88); }
+      18%  { opacity: 1; transform: scale(1); }
+      82%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.94); }
+    }
+    .hud-animate {
+      animation: hudPulse 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* Subtle Glass Scrollbar for Popovers */
+    .glass-scroll::-webkit-scrollbar { width: 4px; }
+    .glass-scroll::-webkit-scrollbar-track { background: transparent; }
+    .glass-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-void text-slate-100 antialiased">
+
+  <!-- ===================================================================== -->
+  <!-- 1. MISSING URL STUDIO ERROR STATE (Shown ONLY when /Url= is empty)    -->
+  <!-- ===================================================================== -->
+  <div id="missingUrlScreen" class="hidden fixed inset-0 z-50 bg-void flex items-center justify-center p-6">
+    <div class="w-full max-w-md rounded-2xl bg-white/[0.025] border border-white/[0.08] backdrop-blur-2xl p-7 sm:p-8 shadow-[0_24px_80px_rgba(0,0,0,0.85)]">
+      <!-- Status Pill -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/25 mb-5">
+        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+        <span class="text-[11px] font-semibold uppercase tracking-widest text-rose-400">Error Occurred</span>
+      </div>
+
+      <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-white">
+        Missing Stream URL
+      </h1>
+
+      <p class="text-sm text-slate-400 leading-relaxed mt-2.5">
+        Please append a valid stream URL to the address bar to begin playback.
+      </p>
+
+      <div class="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs text-slate-500 font-mono">
+        <span class="truncate">/Url=https://example.com/live.m3u8</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- 2. FULL-BLEED 100vw x 100vh CINEMA PLAYER STAGE                       -->
+  <!-- ===================================================================== -->
+  <div id="cinemaStage" class="relative w-screen h-screen bg-void overflow-hidden flex items-center justify-center">
+    <!-- Video Element -->
+    <video
+      id="videoEl"
+      class="fit-contain transition-all duration-150"
+      playsinline
+      autoplay
+      crossorigin="anonymous"
+    ></video>
+
+    <!-- Touch & Mouse Gesture Layer (Left = Brightness/Rewind, Center = Play/HUD, Right = Volume/Forward) -->
+    <div id="gestureLayer" class="absolute inset-0 z-10 flex">
+      <div id="zoneLeft" class="w-1/3 h-full"></div>
+      <div id="zoneCenter" class="w-1/3 h-full"></div>
+      <div id="zoneRight" class="w-1/3 h-full"></div>
+    </div>
+
+    <!-- Center Gesture Feedback Pill (Brightness, Volume, Seek, Play/Pause) -->
+    <div id="gestureHud" class="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center">
+      <div id="gestureHudCard" class="px-5 py-3 rounded-2xl bg-black/70 backdrop-blur-xl border border-white/10 flex flex-col items-center gap-1 shadow-2xl">
+        <div id="gestureHudIcon" class="text-white text-xl"></div>
+        <span id="gestureHudText" class="text-xs font-medium tracking-wide text-slate-200"></span>
+      </div>
+    </div>
+
+    <!-- Minimalist Buffering Spinner -->
+    <div id="bufferingOverlay" class="pointer-events-none absolute inset-0 z-20 hidden flex-col items-center justify-center gap-3 bg-black/30">
+      <div class="w-10 h-10 rounded-full border-2 border-white/15 border-t-white animate-spin"></div>
+      <span id="bufferingLabel" class="text-xs font-medium tracking-wider uppercase text-white/75">Connecting</span>
+    </div>
+
+    <!-- Playback Failure Overlay (Only shown if stream fails non-DRM) -->
+    <div id="streamErrorOverlay" class="hidden absolute inset-0 z-30 bg-void/90 backdrop-blur-xl flex items-center justify-center p-6">
+      <div class="w-full max-w-md rounded-2xl bg-white/[0.03] border border-white/[0.09] p-6 sm:p-7 text-center shadow-2xl">
+        <div class="w-11 h-11 rounded-full bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <h2 id="streamErrorTitle" class="text-lg font-semibold text-white">Playback Interrupted</h2>
+        <p id="streamErrorDesc" class="text-xs sm:text-sm text-slate-400 mt-1.5 leading-relaxed">
+          Unable to load the stream. It may be offline, geo-restricted, or require DRM decryption keys.
+        </p>
+        <div class="mt-5 flex items-center justify-center gap-2.5">
+          <button
+            onclick="retryPlayback()"
+            class="px-4 py-2 rounded-xl bg-white text-black hover:bg-slate-200 text-xs font-semibold transition"
+          >
+            Retry Stream
+          </button>
+          <button
+            onclick="openDrmModal()"
+            class="px-4 py-2 rounded-xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 text-white text-xs font-medium transition"
+          >
+            Enter DRM Key
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen Lock Floating Unlock Pill -->
+    <div id="unlockPill" class="hidden absolute top-5 left-5 z-30">
+      <button
+        onclick="toggleScreenLock()"
+        class="px-3.5 py-2 rounded-xl bg-black/75 hover:bg-black/90 border border-white/15 backdrop-blur-xl text-xs font-medium text-white flex items-center gap-2 shadow-xl transition"
+      >
+        <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span>Unlock Screen</span>
+      </button>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- 3. AUTO-HIDING PRO BROADCAST HUD OVERLAY                            -->
+    <!-- =================================================================== -->
+    <div
+      id="hudOverlay"
+      class="absolute inset-0 z-20 flex flex-col justify-between bg-gradient-to-t from-black/90 via-transparent to-black/75 transition-opacity duration-300 pointer-events-none"
+    >
+      <!-- Top Bar: Stream Meta, Brightness Slider, DRM Key Trigger, Lock -->
+      <div class="pointer-events-auto flex items-center justify-between gap-3 px-4 sm:px-7 pt-4 sm:pt-5 pb-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span id="engineTag" class="px-2 py-0.5 rounded-md bg-white/10 border border-white/10 text-[10px] font-semibold uppercase tracking-wider text-slate-200 shrink-0">
+            STREAM
+          </span>
+          <span id="drmActiveTag" class="hidden px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-400/30 text-[10px] font-semibold uppercase tracking-wider text-amber-300 shrink-0">
+            DRM
+          </span>
+          <p id="hudStreamUrl" class="text-xs text-slate-300/90 font-mono truncate max-w-[45vw] sm:max-w-md">
+            Loading...
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Brightness Control -->
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/50 border border-white/10 backdrop-blur-md" title="Brightness">
+            <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+            </svg>
+            <input
+              id="brightnessRange"
+              type="range"
+              min="50"
+              max="150"
+              value="100"
+              oninput="setBrightness(this.value)"
+              class="cinema-range w-16"
+            />
+            <span id="brightnessLabel" class="text-[11px] font-mono text-slate-300 w-8 text-right">100%</span>
+          </div>
+
+          <!-- DRM Key Button -->
+          <button
+            onclick="openDrmModal()"
+            class="px-2.5 py-1.5 rounded-xl bg-black/50 hover:bg-white/10 border border-white/10 backdrop-blur-md text-xs font-medium text-slate-200 flex items-center gap-1.5 transition"
+            title="DRM Key / License Settings"
+          >
+            <svg class="w-3.5 h-3.5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+            </svg>
+            <span class="hidden md:inline">Key / DRM</span>
+          </button>
+
+          <!-- Screen Lock -->
+          <button
+            onclick="toggleScreenLock()"
+            class="p-2 rounded-xl bg-black/50 hover:bg-white/10 border border-white/10 backdrop-blur-md text-slate-200 transition"
+            title="Lock Screen Controls"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Bottom Bar: Scrubbing Timeline + Transport & Track Controls -->
+      <div class="pointer-events-auto px-4 sm:px-7 pb-4 sm:pb-6 pt-2 flex flex-col gap-3">
+        <!-- Scrubbing Progress Bar -->
+        <div class="relative group/bar flex items-center">
+          <div
+            id="hoverTimeBubble"
+            class="pointer-events-none absolute -top-8 -translate-x-1/2 px-2 py-0.5 rounded-md bg-black/90 border border-white/15 text-[11px] font-mono text-white opacity-0 transition-opacity"
+          >
+            00:00
+          </div>
+
+          <div id="timelineTrack" class="relative w-full h-1.5 group-hover/bar:h-2.5 bg-white/20 rounded-full cursor-pointer transition-all flex items-center">
+            <div id="bufferFill" class="absolute left-0 top-0 h-full bg-white/30 rounded-full pointer-events-none" style="width: 0%"></div>
+            <div id="progressFill" class="relative h-full bg-white rounded-full pointer-events-none" style="width: 0%">
+              <div class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md scale-0 group-hover/bar:scale-100 transition-transform"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transport & Settings Row -->
+        <div class="flex items-center justify-between gap-2">
+          <!-- Left Group -->
+          <div class="flex items-center gap-1.5 sm:gap-3">
+            <!-- Play / Pause -->
+            <button onclick="togglePlayPause()" class="p-2 rounded-xl hover:bg-white/10 text-white transition" title="Play/Pause (Space)">
+              <svg id="iconPlay" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <svg id="iconPause" class="w-5 h-5 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </button>
+
+            <!-- Seek -10s -->
+            <button onclick="seekBy(-10)" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition" title="-10s">
+              <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0019 16V8a1 1 0 00-1.6-.8l-5.333 4zM4.066 11.2a1 1 0 000 1.6l5.334 4A1 1 0 0011 16V8a1 1 0 00-1.6-.8l-5.334 4z"/>
+              </svg>
+            </button>
+
+            <!-- Seek +10s -->
+            <button onclick="seekBy(10)" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition" title="+10s">
+              <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11.933 12.8a1 1 0 000-1.6L6.6 7.2A1 1 0 005 8v8a1 1 0 001.6.8l5.333-4zM19.933 12.8a1 1 0 000-1.6l-5.333-4A1 1 0 0013 8v8a1 1 0 001.6.8l5.333-4z"/>
+              </svg>
+            </button>
+
+            <!-- Volume -->
+            <div class="flex items-center gap-1.5">
+              <button onclick="toggleMute()" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-200 transition" title="Mute (M)">
+                <svg id="iconVolOn" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <svg id="iconVolOff" class="w-5 h-5 text-rose-400 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                </svg>
+              </button>
+              <input
+                id="volumeRange"
+                type="range"
+                min="0"
+                max="100"
+                value="100"
+                oninput="setVolume(this.value)"
+                class="cinema-range w-16 sm:w-20 hidden sm:block"
+              />
+            </div>
+
+            <!-- Timecode & Live Edge Snap -->
+            <div class="flex items-center gap-2 text-xs font-mono text-slate-300">
+              <span id="timeReadout">00:00 / 00:00</span>
+              <button
+                id="liveEdgeBtn"
+                onclick="snapToLive()"
+                class="hidden px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-sans font-semibold uppercase tracking-wider items-center gap-1.5 hover:bg-rose-500/30 transition"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                LIVE
+              </button>
+            </div>
+          </div>
+
+          <!-- Right Group -->
+          <div class="flex items-center gap-1 sm:gap-2">
+            <!-- Speed -->
+            <button
+              id="speedPill"
+              onclick="togglePopover('popoverSpeed')"
+              class="px-2.5 py-1 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] text-xs font-medium text-slate-200 transition"
+              title="Playback Speed"
+            >
+              1x
+            </button>
+
+            <!-- Audio & Subtitles -->
+            <button
+              onclick="togglePopover('popoverTracks')"
+              class="px-2.5 py-1 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] text-xs font-medium text-slate-200 flex items-center gap-1.5 transition"
+              title="Audio & Subtitles"
+            >
+              <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+              </svg>
+              <span class="hidden md:inline">Audio / CC</span>
+            </button>
+
+            <!-- Quality / Resolution -->
+            <button
+              onclick="togglePopover('popoverQuality')"
+              class="px-2.5 py-1 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] text-xs font-semibold text-white flex items-center gap-1.5 transition"
+              title="Video Quality"
+            >
+              <span id="qualityLabel">Auto</span>
+            </button>
+
+            <!-- Aspect Ratio -->
+            <button
+              id="aspectPill"
+              onclick="cycleAspectMode()"
+              class="hidden sm:inline-flex px-2.5 py-1 rounded-lg bg-white/[0.07] hover:bg-white/[0.14] text-xs font-medium text-slate-300 transition"
+              title="Aspect Ratio"
+            >
+              Fit
+            </button>
+
+            <!-- Picture-in-Picture -->
+            <button
+              onclick="togglePiP()"
+              class="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition"
+              title="Picture-in-Picture"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+            </button>
+
+            <!-- Fullscreen -->
+            <button
+              onclick="toggleFullscreen()"
+              class="p-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+              title="Fullscreen (F)"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Popover: Video Quality -->
+      <div id="popoverQuality" class="pointer-events-auto hidden absolute bottom-16 right-4 sm:right-7 z-40 w-44 rounded-2xl bg-[#0c0d12]/95 border border-white/10 backdrop-blur-2xl p-2 shadow-2xl">
+        <div class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 border-b border-white/10 mb-1">
+          Quality
+        </div>
+        <div id="qualityList" class="glass-scroll max-h-48 overflow-y-auto flex flex-col gap-0.5 text-xs">
+          <button onclick="setQuality('auto')" class="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/15 text-white font-semibold">Auto</button>
+        </div>
+      </div>
+
+      <!-- Popover: Playback Speed -->
+      <div id="popoverSpeed" class="pointer-events-auto hidden absolute bottom-16 right-28 sm:right-36 z-40 w-32 rounded-2xl bg-[#0c0d12]/95 border border-white/10 backdrop-blur-2xl p-2 shadow-2xl">
+        <div class="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 border-b border-white/10 mb-1">
+          Speed
+        </div>
+        <div id="speedList" class="flex flex-col gap-0.5 text-xs"></div>
+      </div>
+
+      <!-- Popover: Audio & Subtitles -->
+      <div id="popoverTracks" class="pointer-events-auto hidden absolute bottom-16 right-14 sm:right-20 z-40 w-60 rounded-2xl bg-[#0c0d12]/95 border border-white/10 backdrop-blur-2xl p-3 shadow-2xl">
+        <div class="mb-2.5">
+          <div class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Audio Track</div>
+          <div id="audioList" class="glass-scroll max-h-24 overflow-y-auto flex flex-col gap-0.5 text-xs">
+            <span class="text-slate-500 px-2 py-1">Default</span>
+          </div>
+        </div>
+        <div class="border-t border-white/10 pt-2">
+          <div class="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Subtitles / CC</div>
+          <div id="subtitleList" class="glass-scroll max-h-24 overflow-y-auto flex flex-col gap-0.5 text-xs">
+            <span class="text-slate-500 px-2 py-1">Off</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- 4. GLASSMORPHIC DRM AUTHENTICATION MODAL (Auto-Popup on Encrypted)    -->
+  <!-- ===================================================================== -->
+  <div id="drmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-md p-4">
+    <div class="w-full max-w-md rounded-2xl bg-[#0c0d12]/95 border border-white/15 backdrop-blur-2xl p-6 shadow-[0_25px_90px_rgba(0,0,0,0.95)]">
+      <!-- Header -->
+      <div class="flex items-start justify-between gap-3 pb-4 border-b border-white/10">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-white">DRM Protected Stream</h3>
+            <p id="drmModalSubtitle" class="text-xs text-slate-400 mt-0.5">
+              Enter decryption key or license server URL to unlock playback.
+            </p>
+          </div>
+        </div>
+        <button onclick="closeDrmModal()" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Mode Switcher -->
+      <div class="grid grid-cols-2 gap-1.5 bg-black/60 p-1 rounded-xl my-4 border border-white/[0.08]">
+        <button
+          id="drmTabClearKey"
+          onclick="setDrmTab('clearkey')"
+          class="py-1.5 rounded-lg text-xs font-semibold bg-white text-black transition"
+        >
+          ClearKey (KID : Key)
+        </button>
+        <button
+          id="drmTabLicense"
+          onclick="setDrmTab('license')"
+          class="py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition"
+        >
+          License URL
+        </button>
+      </div>
+
+      <!-- ClearKey Fields -->
+      <div id="drmPanelClearKey" class="flex flex-col gap-3">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-300 mb-1">
+            Paste <code class="text-amber-300">KeyID:Key</code> Pair (Hex or Base64)
+          </label>
+          <input
+            id="inputKidKeyPair"
+            type="text"
+            placeholder="e.g. 1234567890abcdef...:fedcba0987654321..."
+            oninput="parseKidKeyPair(this.value)"
+            class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3.5 py-2.5 text-xs font-mono text-white placeholder-slate-600 outline-none transition"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Key ID (KID)</label>
+            <input
+              id="inputKeyId"
+              type="text"
+              placeholder="32-char Hex or Base64"
+              class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3 py-2 text-xs font-mono text-white placeholder-slate-600 outline-none transition"
+            />
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Decryption Key</label>
+            <input
+              id="inputKeyVal"
+              type="text"
+              placeholder="32-char Hex or Base64"
+              class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3 py-2 text-xs font-mono text-white placeholder-slate-600 outline-none transition"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- License URL Fields -->
+      <div id="drmPanelLicense" class="hidden flex-col gap-3">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-300 mb-1">DRM Scheme</label>
+          <select id="selectDrmScheme" class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3 py-2 text-xs text-white outline-none">
+            <option value="com.widevine.alpha">Widevine (com.widevine.alpha)</option>
+            <option value="com.microsoft.playready">PlayReady (com.microsoft.playready)</option>
+            <option value="org.w3.clearkey">ClearKey License Server</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-300 mb-1">License Server URL</label>
+          <input
+            id="inputLicenseUrl"
+            type="text"
+            placeholder="https://license.provider.com/widevine"
+            class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3.5 py-2 text-xs font-mono text-white placeholder-slate-600 outline-none transition"
+          />
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1">Custom HTTP Headers (Optional JSON or Key: Value)</label>
+          <textarea
+            id="inputCustomHeaders"
+            rows="2"
+            placeholder='{"Authorization": "Bearer token"}'
+            class="w-full rounded-xl bg-black/70 border border-white/15 focus:border-white/50 px-3 py-2 text-xs font-mono text-white placeholder-slate-600 outline-none transition"
+          ></textarea>
+        </div>
+      </div>
+
+      <!-- Modal Actions -->
+      <div class="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-2">
+        <button
+          onclick="clearDrmCredentials()"
+          class="px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-rose-300 transition"
+        >
+          Reset
+        </button>
+        <div class="flex items-center gap-2">
+          <button
+            onclick="closeDrmModal()"
+            class="px-4 py-2 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs font-medium text-slate-300 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="submitDrmAndPlay()"
+            class="px-5 py-2 rounded-xl bg-white hover:bg-slate-200 text-black text-xs font-semibold shadow-lg transition"
+          >
+            Unlock & Play
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. GLOBAL PLAYER STATE
+    // =========================================================================
+    let activeStreamUrl = '';
+    let shakaInstance = null;
+    let hlsInstance = null;
+    let mpegtsInstance = null;
+    let isScreenLocked = false;
+    let hudAutoHideTimer = null;
+    let drmPromptTriggered = false;
+
+    const drmState = {
+      mode: 'clearkey', // 'clearkey' | 'license'
+      keyId: '',
+      key: '',
+      scheme: 'com.widevine.alpha',
+      licenseUrl: '',
+      headers: ''
+    };
+
+    const ASPECT_MODES = [
+      { label: 'Fit', cls: 'fit-contain' },
+      { label: 'Fill', cls: 'fit-cover' },
+      { label: '16:9', cls: 'fit-16-9' },
+      { label: 'Stretch', cls: 'fit-fill' }
+    ];
+    let aspectIndex = 0;
+
+    const videoEl = document.getElementById('videoEl');
+    const cinemaStage = document.getElementById('cinemaStage');
+    const hudOverlay = document.getElementById('hudOverlay');
+
+    // =========================================================================
+    // 2. CASE-INSENSITIVE URL ROUTER (/Url=, /url=, ?url=, #url=)
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.shaka) {
+        shaka.polyfill.installAll();
+      }
+      buildSpeedPopover();
+      bindPlayerEvents();
+      bindTouchAndMouseGestures();
+
+      const parsed = extractTargetUrlAndParams();
+      if (!parsed.streamUrl) {
+        // Show clean studio error screen when /Url= is missing or empty
+        document.getElementById('cinemaStage').classList.add('hidden');
+        document.getElementById('missingUrlScreen').classList.remove('hidden');
+        return;
+      }
+
+      activeStreamUrl = parsed.streamUrl;
+      document.getElementById('hudStreamUrl').textContent = activeStreamUrl;
+
+      // Apply inline DRM params if supplied in the URL
+      if (parsed.keyId && parsed.key) {
+        drmState.mode = 'clearkey';
+        drmState.keyId = parsed.keyId;
+        drmState.key = parsed.key;
+      } else if (parsed.licenseUrl) {
+        drmState.mode = 'license';
+        drmState.licenseUrl = parsed.licenseUrl;
+      }
+      syncDrmModalFromState();
+
+      // Auto-inspect manifest for DRM before/during playback and start stream
+      bootstrapStream(activeStreamUrl);
+    });
+
+    function extractTargetUrlAndParams() {
+      const href = window.location.href;
+      const pathname = window.location.pathname;
+      const search = window.location.search;
+      const hash = window.location.hash;
+
+      let streamUrl = '';
+      let keyId = '';
+      let key = '';
+      let licenseUrl = '';
+
+      // 1. Check path-based /Url=... or /url=... (preserves full query string of target URL)
+      const pathMatch = (pathname + search).match(/\/url=(.*)/i);
+      if (pathMatch && pathMatch[1]) {
+        streamUrl = safeDecode(pathMatch[1]);
+      } else {
+        // 2. Check query parameter ?url=... / ?Url=... or hash #url=...
+        const queryMatch = (search + hash).match(/(?:^\?|\?|&|#)url=([^#]*)/i);
+        if (queryMatch && queryMatch[1]) {
+          // If the target stream URL itself had &keyId= or &license= appended for the wrapper, split cleanly
+          const rawCandidate = queryMatch[1];
+          // Check if wrapper-specific DRM params were appended after stream URL
+          const parts = rawCandidate.split(/&(?=keyId=|kid=|key=|license=|drm=)/i);
+          streamUrl = safeDecode(parts[0]);
+
+          for (let i = 1; i < parts.length; i++) {
+            const [pKey, ...pValArr] = parts[i].split('=');
+            const pVal = safeDecode(pValArr.join('='));
+            const kLower = pKey.toLowerCase();
+            if (kLower === 'keyid' || kLower === 'kid') keyId = pVal;
+            if (kLower === 'key') {
+              if (pVal.includes(':') && !keyId) {
+                const [splitKid, splitK] = pVal.split(':');
+                keyId = splitKid;
+                key = splitK;
+              } else {
+                key = pVal;
+              }
+            }
+            if (kLower === 'license' || kLower === 'drm') licenseUrl = pVal;
+          }
+        }
+      }
+
+      // Also check standard URLSearchParams on window.location.search for DRM overrides
+      const sp = new URLSearchParams(search);
+      for (const [k, v] of sp.entries()) {
+        const kl = k.toLowerCase();
+        if ((kl === 'keyid' || kl === 'kid') && v) keyId = v.trim();
+        if (kl === 'key' && v) {
+          if (v.includes(':') && !keyId) {
+            const [skid, sk] = v.split(':');
+            keyId = skid.trim();
+            key = sk.trim();
+          } else {
+            key = v.trim();
+          }
+        }
+        if ((kl === 'license' || kl === 'drm') && v) licenseUrl = v.trim();
+      }
+
+      // Strip accidental leading/trailing slashes if user typed /Url=/https://...
+      streamUrl = streamUrl.replace(/^\/+(https?:\/\/)/i, '$1').trim();
+
+      return { streamUrl, keyId, key, licenseUrl };
+    }
+
+    function safeDecode(str) {
+      try {
+        return decodeURIComponent(str);
+      } catch {
+        return str;
+      }
+    }
+
+    // =========================================================================
+    // 3. AUTOMATIC MANIFEST & DRM PRE-DETECTION + MULTI-ENGINE PLAYBACK
+    // =========================================================================
+    function hasDrmCredentials() {
+      return (
+        (drmState.mode === 'clearkey' && drmState.keyId.trim() && drmState.key.trim()) ||
+        (drmState.mode === 'license' && drmState.licenseUrl.trim())
+      );
+    }
+
+    async function bootstrapStream(url) {
+      hideStreamError();
+      showBuffering('Detecting Stream');
+
+      // Lightweight non-blocking manifest probe to detect DRM upfront
+      if (!hasDrmCredentials()) {
+        const detectedDrm = await probeManifestForDrm(url);
+        if (detectedDrm) {
+          hideBuffering();
+          promptForDrmKey(detectedDrm.kidHint);
+          return;
+        }
+      }
+
+      await startPlaybackPipeline(url);
+    }
+
+    async function probeManifestForDrm(url) {
+      const cleanPath = url.toLowerCase().split('?')[0].split('#')[0];
+      if (!cleanPath.endsWith('.mpd') && !cleanPath.endsWith('.m3u8')) {
+        return null;
+      }
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!res.ok) return null;
+
+        const text = await res.text();
+
+        // Check DASH (.mpd) ContentProtection tags
+        if (/<ContentProtection/i.test(text)) {
+          const kidMatch = text.match(/default_KID=["']([0-9a-fA-F-]+)["']/i);
+          const kidHint = kidMatch ? kidMatch[1].replace(/-/g, '') : '';
+          return { encrypted: true, kidHint };
+        }
+
+        // Check HLS (.m3u8) #EXT-X-KEY or #EXT-X-SESSION-KEY (excluding METHOD=NONE)
+        if (/#EXT-X-(?:SESSION-)?KEY:[^\n]*METHOD=(?!NONE)/i.test(text)) {
+          return { encrypted: true, kidHint: '' };
+        }
+      } catch {
+        // Ignore CORS or timeout during probe; Shaka/HLS engine will handle playback directly
+      }
+      return null;
+    }
+
+    function promptForDrmKey(kidHint = '') {
+      if (kidHint && !document.getElementById('inputKeyId').value) {
+        document.getElementById('inputKeyId').value = kidHint;
+        drmState.keyId = kidHint;
+      }
+      document.getElementById('drmModalSubtitle').textContent =
+        'Encryption detected on this stream. Enter your ClearKey or License URL to play.';
+      openDrmModal();
+    }
+
+    async function destroyEngines() {
+      if (shakaInstance) {
+        try { await shakaInstance.destroy(); } catch {}
+        shakaInstance = null;
+      }
+      if (hlsInstance) {
+        try { hlsInstance.destroy(); } catch {}
+        hlsInstance = null;
+      }
+      if (mpegtsInstance) {
+        try {
+          mpegtsInstance.pause();
+          mpegtsInstance.unload();
+          mpegtsInstance.detachMediaElement();
+          mpegtsInstance.destroy();
+        } catch {}
+        mpegtsInstance = null;
+      }
+      videoEl.removeAttribute('src');
+      videoEl.load();
+    }
+
+    async function startPlaybackPipeline(url) {
+      await destroyEngines();
+      drmPromptTriggered = false;
+
+      const cleanLower = url.toLowerCase().split('?')[0].split('#')[0];
+      const isTs = cleanLower.endsWith('.ts') || cleanLower.includes('.ts?');
+      const isDirectVideo = /\.(mp4|webm|ogg|mov|mkv|m4v)$/i.test(cleanLower);
+
+      // 1. Raw MPEG-TS (.ts) streams -> mpegts.js
+      if (isTs && window.mpegts && mpegts.getFeatureList().mseLivePlayback) {
+        playWithMpegTs(url);
+        return;
+      }
+
+      // 2. Progressive direct video files (.mp4, .webm, etc.) -> Native HTML5
+      if (isDirectVideo) {
+        playWithNativeHtml5(url);
+        return;
+      }
+
+      // 3. Adaptive HLS (.m3u8) & DASH (.mpd) & DRM -> Shaka Player primary
+      if (window.shaka && shaka.Player.isBrowserSupported()) {
+        await playWithShaka(url);
+      } else if (cleanLower.endsWith('.m3u8') && window.Hls && Hls.isSupported()) {
+        playWithHlsJs(url);
+      } else {
+        playWithNativeHtml5(url);
+      }
+    }
+
+    async function playWithShaka(url) {
+      setEngineTag('SHAKA');
+      shakaInstance = new shaka.Player();
+      await shakaInstance.attach(videoEl);
+
+      // Configure low-latency resilience & retry parameters
+      shakaInstance.configure({
+        streaming: {
+          rebufferingGoal: 2,
+          bufferingGoal: 15,
+          retryParameters: {
+            maxAttempts: 4,
+            baseDelay: 500,
+            backoffFactor: 1.5
+          }
+        },
+        manifest: {
+          retryParameters: {
+            maxAttempts: 3,
+            baseDelay: 500
+          }
+        }
+      });
+
+      applyShakaDrmConfig(shakaInstance);
+
+      shakaInstance.addEventListener('error', (evt) => {
+        handleShakaFailure(evt.detail, url);
+      });
+
+      try {
+        await shakaInstance.load(url);
+        hideBuffering();
+        refreshTracksFromShaka();
+        updateDrmTag();
+        attemptAutoPlay();
+      } catch (err) {
+        handleShakaFailure(err, url);
+      }
+    }
+
+    function applyShakaDrmConfig(player) {
+      const drmConfig = { servers: {}, clearKeys: {} };
+
+      if (drmState.mode === 'clearkey' && drmState.keyId && drmState.key) {
+        const kidHex = toHexKey(drmState.keyId);
+        const keyHex = toHexKey(drmState.key);
+        drmConfig.clearKeys[kidHex] = keyHex;
+      } else if (drmState.mode === 'license' && drmState.licenseUrl) {
+        drmConfig.servers[drmState.scheme] = drmState.licenseUrl;
+
+        const parsedHeaders = parseCustomHeaders(drmState.headers);
+        if (parsedHeaders) {
+          player.getNetworkingEngine().registerRequestFilter((type, request) => {
+            if (type === shaka.net.NetworkingEngine.RequestType.LICENSE) {
+              Object.assign(request.headers, parsedHeaders);
+            }
+          });
+        }
+      }
+
+      player.configure({ drm: drmConfig });
+    }
+
+    function handleShakaFailure(error, url) {
+      const code = error?.code || 0;
+      const msg = String(error?.message || '').toLowerCase();
+
+      // DRM error codes in Shaka: 6000-6999, or 3014/3015/3016 (EME/decryption), or 4032 (encrypted init)
+      const isDrmIssue =
+        (code >= 6000 && code < 7000) ||
+        [3014, 3015, 3016, 4032].includes(code) ||
+        msg.includes('drm') ||
+        msg.includes('license') ||
+        msg.includes('key') ||
+        msg.includes('encrypted');
+
+      if (isDrmIssue) {
+        hideBuffering();
+        if (!drmPromptTriggered) {
+          drmPromptTriggered = true;
+          promptForDrmKey();
+        }
+        return;
+      }
+
+      // Automatic Fallback Chain: Shaka -> HLS.js -> mpegts.js -> Native HTML5
+      const cleanLower = url.toLowerCase().split('?')[0];
+      if ((cleanLower.endsWith('.m3u8') || code === 1001 || code === 4016) && window.Hls && Hls.isSupported()) {
+        playWithHlsJs(url);
+        return;
+      }
+
+      if (window.mpegts && mpegts.getFeatureList().mseLivePlayback && (code === 1001 || code === 4016)) {
+        playWithMpegTs(url);
+        return;
+      }
+
+      playWithNativeHtml5(url);
+    }
+
+    function playWithHlsJs(url) {
+      destroyEngines().then(() => {
+        setEngineTag('HLS');
+        hlsInstance = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          maxBufferLength: 20
+        });
+        hlsInstance.loadSource(url);
+        hlsInstance.attachMedia(videoEl);
+
+        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+          hideBuffering();
+          refreshTracksFromHls();
+          attemptAutoPlay();
+        });
+
+        hlsInstance.on(Hls.Events.ERROR, (_, data) => {
+          if (data.fatal) {
+            if (data.details && data.details.toLowerCase().includes('key')) {
+              hideBuffering();
+              promptForDrmKey();
+            } else {
+              playWithNativeHtml5(url);
+            }
+          }
+        });
+      });
+    }
+
+    function playWithMpegTs(url) {
+      setEngineTag('MPEG-TS');
+      try {
+        mpegtsInstance = mpegts.createPlayer(
+          { type: 'mpegts', isLive: true, url },
+          { enableWorker: true, lazyLoadMaxDuration: 180 }
+        );
+        mpegtsInstance.attachMediaElement(videoEl);
+        mpegtsInstance.load();
+        mpegtsInstance.on(mpegts.Events.ERROR, () => {
+          playWithNativeHtml5(url);
+        });
+        hideBuffering();
+        resetTrackLists();
+        attemptAutoPlay();
+      } catch {
+        playWithNativeHtml5(url);
+      }
+    }
+
+    function playWithNativeHtml5(url) {
+      setEngineTag('NATIVE');
+      resetTrackLists();
+      videoEl.src = url;
+      videoEl.load();
+
+      videoEl.onloadeddata = () => {
+        hideBuffering();
+        attemptAutoPlay();
+      };
+
+      videoEl.onerror = () => {
+        hideBuffering();
+        showStreamError(
+          'Unable to Play Stream',
+          'The stream could not be decoded. Verify the URL is active, CORS-enabled, or enter DRM credentials if encrypted.'
+        );
+      };
+    }
+
+    function attemptAutoPlay() {
+      videoEl.play().catch(() => {
+        // Browser autoplay policy blocked unmuted autoplay: reveal HUD so user can tap Play
+        showHud(true);
+      });
+    }
+
+    function retryPlayback() {
+      if (activeStreamUrl) {
+        bootstrapStream(activeStreamUrl);
+      }
+    }
+
+    // =========================================================================
+    // 4. QUALITY, AUDIO & SUBTITLE TRACK MANAGEMENT
+    // =========================================================================
+    function refreshTracksFromShaka() {
+      if (!shakaInstance) return;
+
+      // Quality Variants
+      const variants = shakaInstance.getVariantTracks();
+      const qList = document.getElementById('qualityList');
+      qList.innerHTML = '';
+
+      const autoBtn = createOptionBtn('Auto', true, () => setQuality('auto'));
+      qList.appendChild(autoBtn);
+
+      const heights = [...new Set(variants.map(v => v.height).filter(Boolean))].sort((a, b) => b - a);
+      heights.forEach(h => {
+        const btn = createOptionBtn(`${h}p`, false, () => setQuality(h));
+        btn.dataset.height = h;
+        qList.appendChild(btn);
+      });
+
+      // Audio Tracks
+      const audios = shakaInstance.getAudioLanguagesAndRoles();
+      const aList = document.getElementById('audioList');
+      aList.innerHTML = '';
+      if (!audios.length) {
+        aList.innerHTML = '<span class="text-slate-500 px-2 py-1">Default</span>';
+      } else {
+        audios.forEach((a, idx) => {
+          const label = (a.language || `Track ${idx + 1}`).toUpperCase() + (a.role ? ` (${a.role})` : '');
+          const btn = createOptionBtn(label, idx === 0, () => {
+            shakaInstance.selectAudioLanguage(a.language, a.role);
+            markSelectedOption(aList, btn);
+            closePopovers();
+          });
+          aList.appendChild(btn);
+        });
+      }
+
+      // Subtitles
+      const texts = shakaInstance.getTextTracks();
+      const sList = document.getElementById('subtitleList');
+      sList.innerHTML = '';
+      const offBtn = createOptionBtn('Off', true, () => {
+        shakaInstance.setTextTrackVisibility(false);
+        markSelectedOption(sList, offBtn);
+        closePopovers();
+      });
+      sList.appendChild(offBtn);
+
+      texts.forEach((t, idx) => {
+        const label = t.label || (t.language || `CC ${idx + 1}`).toUpperCase();
+        const btn = createOptionBtn(label, false, () => {
+          shakaInstance.selectTextTrack(t);
+          shakaInstance.setTextTrackVisibility(true);
+          markSelectedOption(sList, btn);
+          closePopovers();
+        });
+        sList.appendChild(btn);
+      });
+    }
+
+    function refreshTracksFromHls() {
+      if (!hlsInstance) return;
+      const qList = document.getElementById('qualityList');
+      qList.innerHTML = '';
+      const autoBtn = createOptionBtn('Auto', true, () => {
+        hlsInstance.currentLevel = -1;
+        document.getElementById('qualityLabel').textContent = 'Auto';
+        markSelectedOption(qList, autoBtn);
+        closePopovers();
+      });
+      qList.appendChild(autoBtn);
+
+      hlsInstance.levels.forEach((lvl, idx) => {
+        const label = lvl.height ? `${lvl.height}p` : `Level ${idx + 1}`;
+        const btn = createOptionBtn(label, false, () => {
+          hlsInstance.currentLevel = idx;
+          document.getElementById('qualityLabel').textContent = label;
+          markSelectedOption(qList, btn);
+          closePopovers();
+        });
+        qList.appendChild(btn);
+      });
+    }
+
+    function setQuality(height) {
+      const qList = document.getElementById('qualityList');
+      if (height === 'auto') {
+        if (shakaInstance) shakaInstance.configure({ abr: { enabled: true } });
+        document.getElementById('qualityLabel').textContent = 'Auto';
+        markSelectedOption(qList, qList.firstChild);
+      } else if (shakaInstance) {
+        shakaInstance.configure({ abr: { enabled: false } });
+        const matches = shakaInstance.getVariantTracks().filter(v => v.height === height);
+        if (matches.length) shakaInstance.selectVariantTrack(matches[0], true);
+        document.getElementById('qualityLabel').textContent = `${height}p`;
+        const target = Array.from(qList.children).find(el => Number(el.dataset.height) === height);
+        if (target) markSelectedOption(qList, target);
+      }
+      closePopovers();
+    }
+
+    function resetTrackLists() {
+      document.getElementById('qualityLabel').textContent = 'Auto';
+      document.getElementById('qualityList').innerHTML =
+        '<button onclick="setQuality(\'auto\')" class="w-full text-left px-2.5 py-1.5 rounded-lg bg-white/15 text-white font-semibold">Auto</button>';
+      document.getElementById('audioList').innerHTML = '<span class="text-slate-500 px-2 py-1">Default</span>';
+      document.getElementById('subtitleList').innerHTML = '<span class="text-slate-500 px-2 py-1">Off</span>';
+    }
+
+    function createOptionBtn(label, active, onClick) {
+      const btn = document.createElement('button');
+      btn.className = active
+        ? 'w-full text-left px-2.5 py-1.5 rounded-lg bg-white/15 text-white font-semibold transition'
+        : 'w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-300 transition';
+      btn.textContent = label;
+      btn.onclick = onClick;
+      return btn;
+    }
+
+    function markSelectedOption(container, activeBtn) {
+      Array.from(container.children).forEach(el => {
+        if (el.tagName === 'BUTTON') {
+          el.className = 'w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-300 transition';
+        }
+      });
+      if (activeBtn) {
+        activeBtn.className = 'w-full text-left px-2.5 py-1.5 rounded-lg bg-white/15 text-white font-semibold transition';
+      }
+    }
+
+    // =========================================================================
+    // 5. DRM MODAL & CREDENTIAL PARSING
+    // =========================================================================
+    function openDrmModal() {
+      syncDrmModalFromState();
+      const modal = document.getElementById('drmModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeDrmModal() {
+      const modal = document.getElementById('drmModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function setDrmTab(mode) {
+      drmState.mode = mode;
+      const tabCK = document.getElementById('drmTabClearKey');
+      const tabLic = document.getElementById('drmTabLicense');
+      const panelCK = document.getElementById('drmPanelClearKey');
+      const panelLic = document.getElementById('drmPanelLicense');
+
+      if (mode === 'clearkey') {
+        tabCK.className = 'py-1.5 rounded-lg text-xs font-semibold bg-white text-black transition';
+        tabLic.className = 'py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        panelCK.classList.remove('hidden');
+        panelCK.classList.add('flex');
+        panelLic.classList.add('hidden');
+        panelLic.classList.remove('flex');
+      } else {
+        tabLic.className = 'py-1.5 rounded-lg text-xs font-semibold bg-white text-black transition';
+        tabCK.className = 'py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition';
+        panelLic.classList.remove('hidden');
+        panelLic.classList.add('flex');
+        panelCK.classList.add('hidden');
+        panelCK.classList.remove('flex');
+      }
+    }
+
+    function parseKidKeyPair(raw) {
+      const val = raw.trim();
+      if (val.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(val);
+          const firstKey = Object.keys(parsed)[0];
+          if (firstKey) {
+            document.getElementById('inputKeyId').value = firstKey;
+            document.getElementById('inputKeyVal').value = parsed[firstKey];
+          }
+        } catch {}
+      } else if (val.includes(':')) {
+        const [kid, k] = val.split(':');
+        document.getElementById('inputKeyId').value = kid.trim();
+        document.getElementById('inputKeyVal').value = k.trim();
+      }
+    }
+
+    function syncDrmModalFromState() {
+      setDrmTab(drmState.mode);
+      document.getElementById('inputKeyId').value = drmState.keyId;
+      document.getElementById('inputKeyVal').value = drmState.key;
+      document.getElementById('inputKidKeyPair').value =
+        drmState.keyId && drmState.key ? `${drmState.keyId}:${drmState.key}` : '';
+      document.getElementById('selectDrmScheme').value = drmState.scheme;
+      document.getElementById('inputLicenseUrl').value = drmState.licenseUrl;
+      document.getElementById('inputCustomHeaders').value = drmState.headers;
+      updateDrmTag();
+    }
+
+    function submitDrmAndPlay() {
+      drmState.keyId = document.getElementById('inputKeyId').value.trim();
+      drmState.key = document.getElementById('inputKeyVal').value.trim();
+      drmState.scheme = document.getElementById('selectDrmScheme').value;
+      drmState.licenseUrl = document.getElementById('inputLicenseUrl').value.trim();
+      drmState.headers = document.getElementById('inputCustomHeaders').value.trim();
+
+      updateDrmTag();
+      closeDrmModal();
+      hideStreamError();
+
+      if (activeStreamUrl) {
+        showBuffering('Unlocking Stream');
+        startPlaybackPipeline(activeStreamUrl);
+      }
+    }
+
+    function clearDrmCredentials() {
+      drmState.keyId = '';
+      drmState.key = '';
+      drmState.licenseUrl = '';
+      drmState.headers = '';
+      syncDrmModalFromState();
+    }
+
+    function toHexKey(val) {
+      const clean = val.trim().replace(/-/g, '');
+      if (/^[0-9a-fA-F]{32}$/.test(clean)) return clean.toLowerCase();
+      try {
+        const b64 = clean.replace(/-/g, '+').replace(/_/g, '/');
+        const bin = atob(b64);
+        let hex = '';
+        for (let i = 0; i < bin.length; i++) {
+          hex += bin.charCodeAt(i).toString(16).padStart(2, '0');
+        }
+        return hex.toLowerCase();
+      } catch {
+        return clean.toLowerCase();
+      }
+    }
+
+    function parseCustomHeaders(raw) {
+      const text = raw.trim();
+      if (!text) return null;
+      if (text.startsWith('{')) {
+        try { return JSON.parse(text); } catch { return null; }
+      }
+      const headers = {};
+      text.split('\n').forEach(line => {
+        const idx = line.indexOf(':');
+        if (idx > 0) {
+          headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+        }
+      });
+      return Object.keys(headers).length ? headers : null;
+    }
+
+    function updateDrmTag() {
+      document.getElementById('drmActiveTag').classList.toggle('hidden', !hasDrmCredentials());
+    }
+
+    // =========================================================================
+    // 6. TRANSPORT CONTROLS, TIMELINE SCRUBBING & GESTURES
+    // =========================================================================
+    function bindPlayerEvents() {
+      // Encrypted EME browser event fallback
+      videoEl.addEventListener('encrypted', () => {
+        if (!hasDrmCredentials() && !drmPromptTriggered) {
+          drmPromptTriggered = true;
+          promptForDrmKey();
+        }
+      });
+
+      videoEl.addEventListener('play', () => {
+        document.getElementById('iconPlay').classList.add('hidden');
+        document.getElementById('iconPause').classList.remove('hidden');
+        scheduleHudHide();
+      });
+
+      videoEl.addEventListener('pause', () => {
+        document.getElementById('iconPlay').classList.remove('hidden');
+        document.getElementById('iconPause').classList.add('hidden');
+        showHud(true);
+      });
+
+      videoEl.addEventListener('waiting', () => showBuffering('Buffering'));
+      videoEl.addEventListener('playing', () => hideBuffering());
+
+      videoEl.addEventListener('timeupdate', () => {
+        const dur = videoEl.duration;
+        const cur = videoEl.currentTime;
+        const liveBtn = document.getElementById('liveEdgeBtn');
+
+        if (!isFinite(dur) || isNaN(dur)) {
+          liveBtn.classList.remove('hidden');
+          liveBtn.classList.add('inline-flex');
+          document.getElementById('timeReadout').textContent = formatDuration(cur);
+          document.getElementById('progressFill').style.width = '100%';
+        } else {
+          liveBtn.classList.add('hidden');
+          liveBtn.classList.remove('inline-flex');
+          const pct = dur > 0 ? (cur / dur) * 100 : 0;
+          document.getElementById('progressFill').style.width = `${pct}%`;
+          document.getElementById('timeReadout').textContent = `${formatDuration(cur)} / ${formatDuration(dur)}`;
+        }
+
+        if (isFinite(dur) && dur > 0 && videoEl.buffered.length > 0) {
+          const end = videoEl.buffered.end(videoEl.buffered.length - 1);
+          document.getElementById('bufferFill').style.width = `${Math.min(100, (end / dur) * 100)}%`;
+        }
+      });
+
+      // Timeline Scrubbing & Hover Time Bubble
+      const track = document.getElementById('timelineTrack');
+      const bubble = document.getElementById('hoverTimeBubble');
+
+      track.addEventListener('mousemove', (e) => {
+        if (!isFinite(videoEl.duration)) return;
+        const rect = track.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        bubble.textContent = formatDuration(ratio * videoEl.duration);
+        bubble.style.left = `${ratio * 100}%`;
+        bubble.style.opacity = '1';
+      });
+
+      track.addEventListener('mouseleave', () => {
+        bubble.style.opacity = '0';
+      });
+
+      track.addEventListener('click', (e) => {
+        if (!isFinite(videoEl.duration)) return;
+        const rect = track.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        videoEl.currentTime = ratio * videoEl.duration;
+      });
+
+      // Reveal HUD on Mouse Movement
+      cinemaStage.addEventListener('mousemove', () => {
+        if (!isScreenLocked) showHud();
+      });
+
+      // Keyboard Controls
+      document.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+        if (isScreenLocked) return;
+
+        switch (e.key.toLowerCase()) {
+          case ' ':
+          case 'k':
+            e.preventDefault();
+            togglePlayPause();
+            break;
+          case 'arrowleft':
+            e.preventDefault();
+            seekBy(-10);
+            break;
+          case 'arrowright':
+            e.preventDefault();
+            seekBy(10);
+            break;
+          case 'arrowup':
+            e.preventDefault();
+            setVolume(Math.min(100, Math.round(videoEl.volume * 100) + 10));
+            break;
+          case 'arrowdown':
+            e.preventDefault();
+            setVolume(Math.max(0, Math.round(videoEl.volume * 100) - 10));
+            break;
+          case 'm':
+            toggleMute();
+            break;
+          case 'f':
+            toggleFullscreen();
+            break;
+        }
+      });
+    }
+
+    function bindTouchAndMouseGestures() {
+      const zLeft = document.getElementById('zoneLeft');
+      const zCenter = document.getElementById('zoneCenter');
+      const zRight = document.getElementById('zoneRight');
+      let lastTap = 0;
+
+      function onZoneClick(side) {
+        if (isScreenLocked) {
+          document.getElementById('unlockPill').classList.remove('hidden');
+          return;
+        }
+        const now = Date.now();
+        const doubleTap = now - lastTap < 280;
+        lastTap = now;
+
+        if (doubleTap) {
+          if (side === 'left') seekBy(-10);
+          else if (side === 'right') seekBy(10);
+          else togglePlayPause();
+        } else {
+          toggleHud();
+        }
+      }
+
+      zLeft.addEventListener('click', () => onZoneClick('left'));
+      zCenter.addEventListener('click', () => onZoneClick('center'));
+      zRight.addEventListener('click', () => onZoneClick('right'));
+
+      // Mobile Swipe: Left = Brightness, Right = Volume
+      let startY = 0;
+      let baseVal = 100;
+
+      zLeft.addEventListener('touchstart', (e) => {
+        if (isScreenLocked) return;
+        startY = e.touches[0].clientY;
+        baseVal = Number(document.getElementById('brightnessRange').value);
+      }, { passive: true });
+
+      zLeft.addEventListener('touchmove', (e) => {
+        if (isScreenLocked) return;
+        const delta = startY - e.touches[0].clientY;
+        setBrightness(Math.max(50, Math.min(150, Math.round(baseVal + delta * 0.4))));
+      }, { passive: true });
+
+      zRight.addEventListener('touchstart', (e) => {
+        if (isScreenLocked) return;
+        startY = e.touches[0].clientY;
+        baseVal = Math.round(videoEl.volume * 100);
+      }, { passive: true });
+
+      zRight.addEventListener('touchmove', (e) => {
+        if (isScreenLocked) return;
+        const delta = startY - e.touches[0].clientY;
+        setVolume(Math.max(0, Math.min(100, Math.round(baseVal + delta * 0.4))));
+      }, { passive: true });
+    }
+
+    function togglePlayPause() {
+      if (videoEl.paused) {
+        videoEl.play().catch(() => {});
+        flashGestureHud('▶', 'Play');
+      } else {
+        videoEl.pause();
+        flashGestureHud('❚❚', 'Paused');
+      }
+    }
+
+    function seekBy(sec) {
+      if (!isFinite(videoEl.duration)) return;
+      videoEl.currentTime = Math.max(0, Math.min(videoEl.duration, videoEl.currentTime + sec));
+      flashGestureHud(sec > 0 ? '⏩' : '⏪', `${sec > 0 ? '+' : ''}${sec}s`);
+    }
+
+    function snapToLive() {
+      if (shakaInstance && shakaInstance.isLive()) {
+        videoEl.currentTime = shakaInstance.seekRange().end - 1;
+      } else if (videoEl.buffered.length > 0) {
+        videoEl.currentTime = videoEl.buffered.end(videoEl.buffered.length - 1);
+      }
+    }
+
+    function setVolume(val) {
+      const clamped = Math.max(0, Math.min(100, Number(val)));
+      videoEl.volume = clamped / 100;
+      videoEl.muted = clamped === 0;
+      document.getElementById('volumeRange').value = clamped;
+      syncVolumeIcon();
+      flashGestureHud(clamped === 0 ? '🔇' : '🔊', `${clamped}%`);
+    }
+
+    function toggleMute() {
+      videoEl.muted = !videoEl.muted;
+      syncVolumeIcon();
+      flashGestureHud(videoEl.muted ? '🔇' : '🔊', videoEl.muted ? 'Muted' : `${Math.round(videoEl.volume * 100)}%`);
+    }
+
+    function syncVolumeIcon() {
+      const muted = videoEl.muted || videoEl.volume === 0;
+      document.getElementById('iconVolOn').classList.toggle('hidden', muted);
+      document.getElementById('iconVolOff').classList.toggle('hidden', !muted);
+    }
+
+    function setBrightness(val) {
+      const clamped = Math.max(50, Math.min(150, Number(val)));
+      videoEl.style.filter = `brightness(${clamped}%)`;
+      document.getElementById('brightnessRange').value = clamped;
+      document.getElementById('brightnessLabel').textContent = `${clamped}%`;
+      flashGestureHud('☀️', `${clamped}%`);
+    }
+
+    function buildSpeedPopover() {
+      const speeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
+      const list = document.getElementById('speedList');
+      speeds.forEach(sp => {
+        const btn = createOptionBtn(`${sp}x`, sp === 1, () => {
+          videoEl.playbackRate = sp;
+          document.getElementById('speedPill').textContent = `${sp}x`;
+          markSelectedOption(list, btn);
+          closePopovers();
+          flashGestureHud('⚡', `${sp}x`);
+        });
+        list.appendChild(btn);
+      });
+    }
+
+    function cycleAspectMode() {
+      ASPECT_MODES.forEach(m => videoEl.classList.remove(m.cls));
+      aspectIndex = (aspectIndex + 1) % ASPECT_MODES.length;
+      const current = ASPECT_MODES[aspectIndex];
+      videoEl.classList.add(current.cls);
+      document.getElementById('aspectPill').textContent = current.label;
+      flashGestureHud('📐', current.label);
+    }
+
+    function toggleScreenLock() {
+      isScreenLocked = !isScreenLocked;
+      if (isScreenLocked) {
+        hudOverlay.classList.add('opacity-0');
+        document.getElementById('unlockPill').classList.remove('hidden');
+        closePopovers();
+      } else {
+        document.getElementById('unlockPill').classList.add('hidden');
+        showHud();
+      }
+    }
+
+    async function togglePiP() {
+      try {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture();
+        else if (document.pictureInPictureEnabled) await videoEl.requestPictureInPicture();
+      } catch {}
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) cinemaStage.requestFullscreen().catch(() => {});
+      else document.exitFullscreen().catch(() => {});
+    }
+
+    // =========================================================================
+    // 7. HUD VISIBILITY & UI HELPERS
+    // =========================================================================
+    function showHud(keepOpen = false) {
+      if (isScreenLocked) return;
+      hudOverlay.classList.remove('opacity-0');
+      clearTimeout(hudAutoHideTimer);
+      if (!keepOpen && !videoEl.paused) {
+        scheduleHudHide();
+      }
+    }
+
+    function scheduleHudHide() {
+      clearTimeout(hudAutoHideTimer);
+      hudAutoHideTimer = setTimeout(() => {
+        if (!videoEl.paused) {
+          hudOverlay.classList.add('opacity-0');
+          closePopovers();
+        }
+      }, 3000);
+    }
+
+    function toggleHud() {
+      if (hudOverlay.classList.contains('opacity-0')) showHud();
+      else {
+        hudOverlay.classList.add('opacity-0');
+        closePopovers();
+      }
+    }
+
+    function togglePopover(id) {
+      const el = document.getElementById(id);
+      const hidden = el.classList.contains('hidden');
+      closePopovers();
+      if (hidden) el.classList.remove('hidden');
+    }
+
+    function closePopovers() {
+      ['popoverQuality', 'popoverSpeed', 'popoverTracks'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+    }
+
+    let gestureTimer = null;
+    function flashGestureHud(icon, text) {
+      const hud = document.getElementById('gestureHud');
+      const card = document.getElementById('gestureHudCard');
+      document.getElementById('gestureHudIcon').textContent = icon;
+      document.getElementById('gestureHudText').textContent = text;
+      hud.classList.remove('hidden');
+      hud.classList.add('flex');
+      card.classList.remove('hud-animate');
+      void card.offsetWidth;
+      card.classList.add('hud-animate');
+      clearTimeout(gestureTimer);
+      gestureTimer = setTimeout(() => {
+        hud.classList.add('hidden');
+        hud.classList.remove('flex');
+      }, 800);
+    }
+
+    function setEngineTag(tag) {
+      document.getElementById('engineTag').textContent = tag;
+    }
+
+    function showBuffering(label) {
+      document.getElementById('bufferingLabel').textContent = label || 'Loading';
+      const el = document.getElementById('bufferingOverlay');
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    }
+
+    function hideBuffering() {
+      const el = document.getElementById('bufferingOverlay');
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    }
+
+    function showStreamError(title, desc) {
+      document.getElementById('streamErrorTitle').textContent = title;
+      document.getElementById('streamErrorDesc').textContent = desc;
+      document.getElementById('streamErrorOverlay').classList.remove('hidden');
+    }
+
+    function hideStreamError() {
+      document.getElementById('streamErrorOverlay').classList.add('hidden');
+    }
+
+    function formatDuration(sec) {
+      if (!isFinite(sec) || isNaN(sec) || sec < 0) return '00:00';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return h > 0
+        ? `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+        : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+  </script>
+</body>
+</html>
