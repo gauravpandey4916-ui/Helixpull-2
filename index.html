@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HELIXPULL | Live Sports & Broadcast</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts: Inter & Orbitron for sports accents -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Orbitron:wght@600;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome for Crisp UI Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Orbitron', 'sans-serif'],
+                    },
+                    colors: {
+                        obsidian: '#06080d',
+                        cardDark: 'rgba(17, 22, 34, 0.72)',
+                        accentCyan: '#00f2fe',
+                        accentIndigo: '#4facfe',
+                        liveRed: '#ff2a5f'
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Scrollbar for Premium Feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #06080d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #38bdf8;
+        }
+
+        /* Hide scrollbar for category pills */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Glassmorphism Card Effects */
+        .glass-panel {
+            background: rgba(15, 20, 32, 0.72);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Hardware-accelerated, lag-free card transitions + Smart TV D-Pad Focus Ring */
+        .channel-card {
+            will-change: transform;
+            transform: translateZ(0);
+            transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .channel-card:hover,
+        .channel-card:focus-visible {
+            transform: translateY(-4px) scale(1.015) translateZ(0);
+            border-color: rgba(56, 189, 248, 0.55);
+            box-shadow: 0 16px 30px -10px rgba(0, 0, 0, 0.75), 0 0 0 2px rgba(56, 189, 248, 0.35);
+            outline: none;
+        }
+
+        /* Respect reduced motion & low-power TV browsers */
+        @media (prefers-reduced-motion: reduce) {
+            .channel-card {
+                transition: none;
+            }
+        }
+
+        /* Smooth iframe container */
+        #player-view {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: #000;
+            z-index: 50;
+            transform: translateZ(0);
+        }
+    </style>
+</head>
+<body class="bg-obsidian text-slate-100 font-sans antialiased selection:bg-sky-500/30 selection:text-sky-200 overflow-x-hidden min-h-screen">
+
+    <!-- Interactive JavaScript Sports Particle Canvas Background -->
+    <canvas id="particle-canvas" class="fixed inset-0 w-full h-full pointer-events-none z-0"></canvas>
+
+    <!-- Subtle Ambient Broadcast Glows (GPU friendly) -->
+    <div class="fixed top-[-15%] left-[-10%] w-[40vw] h-[40vw] rounded-full bg-sky-600/10 blur-[100px] pointer-events-none z-0"></div>
+    <div class="fixed bottom-[-15%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-indigo-600/10 blur-[100px] pointer-events-none z-0"></div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 1: CHANNEL DIRECTORY (Shown when no ?id= parameter is provided)  -->
+    <!-- ===================================================================== -->
+    <div id="directory-view" class="relative z-10 min-h-screen flex flex-col">
+        
+        <!-- Top Navigation Header -->
+        <header class="sticky top-0 z-30 glass-panel border-b border-white/10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between gap-4">
+                
+                <!-- Brand Logo -->
+                <a href="?" onclick="navigateToDirectory(event)" class="flex items-center gap-3 group shrink-0">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/25 group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-satellite-dish text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-display font-bold text-lg sm:text-xl tracking-wider bg-gradient-to-r from-white via-sky-100 to-slate-400 bg-clip-text text-transparent">
+                            HELIX<span class="text-sky-400">PULL</span>
+                        </h1>
+                        <p class="text-[10px] uppercase tracking-[0.2em] text-slate-400 hidden sm:block">Ultra HD Broadcast Hub</p>
+                    </div>
+                </a>
+
+                <!-- Search Bar -->
+                <div class="flex-1 max-w-md">
+                    <div class="relative group">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm group-focus-within:text-sky-400 transition-colors"></i>
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="Search channels, languages, sports..." 
+                            class="w-full bg-slate-900/80 border border-white/10 rounded-full py-2 sm:py-2.5 pl-10 pr-4 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-500/20 transition-all"
+                        >
+                        <button id="clear-search" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Live Status Badge -->
+                <div class="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/25">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500"></span>
+                    </span>
+                    <span id="total-channels-badge" class="text-xs font-semibold text-rose-300 tracking-wide">36 CHANNELS LIVE</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Container -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+            
+            <!-- Header Section -->
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+                <div>
+                    <div class="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-400/90 mb-1.5">
+                        <i class="fa-solid fa-trophy text-[10px]"></i>
+                        <span>Live Sports &amp; Stadium Feeds</span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">Select a Broadcast Channel</h2>
+                    <p class="text-slate-400 text-xs sm:text-sm mt-1">Optimized for Smart TV, Mobile, Tablet &amp; Desktop • Use arrow keys or tap to play.</p>
+                </div>
+                <div class="hidden lg:flex items-center gap-4 text-xs text-slate-400 glass-panel px-4 py-2 rounded-2xl">
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-tv text-sky-400"></i> TV D-Pad Ready</span>
+                    <span class="text-white/15">|</span>
+                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-gauge-high text-emerald-400"></i> Low-CPU Mode</span>
+                </div>
+            </div>
+
+            <!-- Network Category Filter Bar -->
+            <div id="category-filters" class="flex items-center gap-2 sm:gap-2.5 overflow-x-auto no-scrollbar pb-3 mb-6">
+                <!-- Category Pills Injected Dynamically via JS -->
+            </div>
+
+            <!-- Channels Grid (Adaptive across Phone, Tablet, Laptop, Desktop & 4K TV) -->
+            <div id="channels-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5 lg:gap-6">
+                <!-- Channel Cards Injected Dynamically via JS -->
+            </div>
+
+            <!-- Empty Search State -->
+            <div id="empty-state" class="hidden text-center py-20 glass-panel rounded-3xl mt-4">
+                <div class="w-16 h-16 rounded-2xl bg-slate-800/80 flex items-center justify-center mx-auto mb-4 text-slate-400 text-2xl">
+                    <i class="fa-solid fa-tv"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">No matching channels found</h3>
+                <p class="text-slate-400 text-sm mt-1 mb-5">Try clearing your search filter.</p>
+                <button onclick="resetFilters()" class="px-5 py-2.5 rounded-full bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-sm transition-colors">
+                    Show All Channels
+                </button>
+            </div>
+        </main>
+
+        <!-- Minimal Footer -->
+        <footer class="border-t border-white/5 py-6 mt-12 text-center text-xs text-slate-500">
+            <p>HELIXPULL STREAMING ENGINE • Direct Source API Integration</p>
+        </footer>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- SERVER SELECTION MODAL (For grouped multi-server channel cards)       -->
+    <!-- ===================================================================== -->
+    <div id="server-modal" onclick="if(event.target===this) closeServerModal()" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md transition-opacity">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 border border-white/15 shadow-2xl relative">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <span class="text-[10px] font-bold uppercase tracking-[0.2em] text-sky-400">Select Stream Feed</span>
+                    <h3 id="modal-channel-title" class="text-xl font-bold text-white mt-0.5">Sony Sports</h3>
+                </div>
+                <button onclick="closeServerModal()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-400 mb-4">Choose an available broadcast server below to start streaming:</p>
+            <div id="modal-server-list" class="grid grid-cols-1 gap-2.5">
+                <!-- Server buttons injected dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- VIEW 2: FULLSCREEN PLAYER (Shown when ?id=CHANNEL_ID is provided)     -->
+    <!-- ===================================================================== -->
+    <div id="player-view" class="hidden">
+        
+        <!-- Ultra-Minimal Floating Top Bar Toggle to Switch Channels -->
+        <div id="minimal-top-bar" class="fixed top-3 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-950/80 hover:bg-slate-950/95 focus-within:bg-slate-950/95 backdrop-blur-md border border-white/15 shadow-2xl transition-opacity duration-500 opacity-90 hover:opacity-100 focus-within:opacity-100 max-w-[95vw]">
+            
+            <!-- Back to All Channels Grid Button -->
+            <button 
+                onclick="navigateToDirectory(event)" 
+                title="All Channels"
+                aria-label="Back to All Channels"
+                class="flex items-center justify-center w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-white/10 hover:bg-sky-500 focus-visible:bg-sky-500 hover:text-slate-950 focus-visible:text-slate-950 text-slate-200 transition-colors shrink-0 outline-none"
+            >
+                <i class="fa-solid fa-border-all text-xs"></i>
+            </button>
+
+            <!-- Live Dot -->
+            <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-1 shrink-0"></span>
+
+            <!-- Compact Channel Switcher Select Dropdown -->
+            <div class="relative flex items-center">
+                <select 
+                    id="quick-channel-select" 
+                    aria-label="Switch Channel"
+                    class="appearance-none bg-transparent text-white text-xs sm:text-sm font-medium pl-1.5 pr-6 py-0.5 rounded-full focus:outline-none cursor-pointer max-w-[190px] sm:max-w-[260px] truncate"
+                >
+                    <!-- Options populated dynamically -->
+                </select>
+                <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 pointer-events-none absolute right-1.5"></i>
+            </div>
+
+            <!-- Quick Prev / Next Channel Mini Buttons -->
+            <div class="hidden sm:flex items-center gap-1 border-l border-white/15 pl-1.5">
+                <button onclick="switchAdjacentChannel(-1)" title="Previous Channel" class="w-6 h-6 rounded-full hover:bg-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-chevron-left text-[10px]"></i>
+                </button>
+                <button onclick="switchAdjacentChannel(1)" title="Next Channel" class="w-6 h-6 rounded-full hover:bg-white/15 flex items-center justify-center text-slate-300 hover:text-white transition-colors">
+                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Subtle Loading Spinner Behind Iframe -->
+        <div id="iframe-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-obsidian z-10 pointer-events-none transition-opacity duration-500">
+            <div class="w-10 h-10 border-2 border-sky-500/30 border-t-sky-400 rounded-full animate-spin mb-3"></div>
+            <p id="loading-channel-name" class="text-xs text-slate-400 tracking-wider uppercase">Connecting to stream...</p>
+        </div>
+
+        <!-- Native API Iframe Player (No external custom player UI overlays) -->
+        <iframe 
+            id="stream-iframe"
+            src=""
+            class="relative z-20 w-full h-full border-0 bg-transparent"
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture; accelerometer; gyroscope"
+            allowfullscreen
+            referrerpolicy="no-referrer"
+        ></iframe>
+    </div>
+
+    <!-- Custom Toast Notification (Never using alert()) -->
+    <div id="toast-box" class="fixed bottom-5 right-5 z-[70] transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="glass-panel px-4 py-3 rounded-2xl border border-sky-500/30 shadow-xl flex items-center gap-3 text-sm text-white">
+            <i class="fa-solid fa-circle-info text-sky-400"></i>
+            <span id="toast-message">Notification</span>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- APPLICATION LOGIC & PARTICLE GRAPHICS ENGINE                          -->
+    <!-- ===================================================================== -->
+    <script>
+        /**
+         * 1. SOURCE API DATA
+         */
+        const API_DATA = {
+            "iframes": [
+                { "id": "Hindi", "name": "Hindi  ", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=STEN3", "category": "Cricket", "logourl": "", "updated_at": "2026-11-21T18:37:56.700Z" },
+                { "id": "English", "name": "English ", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=STEN1", "category": "Cricket", "logourl": "", "updated_at": "2026-11-19T17:47:17.973Z" },
+                { "id": "Tamil", "name": "Tamil", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=STENT", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:35:20.296Z" },
+                { "id": "Telugu", "name": "Telugu", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=STENTU", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:35:24.879Z" },
+                { "id": "STAR", "name": "Star Sports Hindi ", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=H2HD", "category": "Cricket", "logourl": "", "updated_at": "2026-10-28T08:11:08.751Z" },
+                { "id": "STAREN", "name": "Star Sports English ", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=E1HD", "category": "Cricket", "logourl": "", "updated_at": "2026-11-07T12:12:55.209Z" },
+                { "id": "Willow", "name": "Willow  By Cricbuzz WorldWide", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow.html", "category": "Cricket", "logourl": "", "updated_at": "2026-11-21T08:26:07.072Z" },
+                { "id": "Willow-2", "name": "Willow By Cricbuzz 2  ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow-2.html", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:36:19.790Z" },
+                { "id": "Willow-3", "name": "Willow By Cricbuzz 3 ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow-3.html", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:36:10.909Z" },
+                { "id": "Willow-4", "name": "Willow By Cricbuzz 4", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow-4.html", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:36:03.905Z" },
+                { "id": "Cricbuzz", "name": "Astro By Cricbuzz ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:36:34.445Z" },
+                { "id": "Cricbuzz-2", "name": "Astro By Cricbuzz ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:36:45.439Z" },
+                { "id": "TNT", "name": "TNT Sports ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/tnt", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:37:04.836Z" },
+                { "id": "SD", "name": "Star Sports SD", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=H1SD", "category": "Cricket", "logourl": "", "updated_at": "2026-11-17T12:04:19.423Z" },
+                { "id": "All", "name": "All Devices Support", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/all", "category": "Cricket", "logourl": "", "updated_at": "2026-11-17T04:37:26.681Z" },
+                { "id": "TEN 1", "name": "iPHONE & iOS User ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten1", "category": "Cricket", "logourl": "", "updated_at": "2026-11-22T04:24:43.203Z" },
+                { "id": "Exp", "name": "Extra Slot Channel", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/willow-2", "category": "Cricket", "logourl": "", "updated_at": "2026-11-15T03:49:57.151Z" },
+                { "id": "VETO", "name": "Veto Sports Events ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/all", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:37:49.575Z" },
+                { "id": "FC", "name": "Fancode IND Stream ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/tnt", "category": "Cricket", "logourl": "", "updated_at": "2026-11-18T03:38:19.441Z" },
+                { "id": "FC2", "name": "Fancode IND Stream 2 ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/fc2", "category": "Football", "logourl": "", "updated_at": "2026-11-09T21:38:26.784Z" },
+                { "id": "U8HINDI", "name": "Unit8 Sports Hindi ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/unit8hin", "category": "Football", "logourl": "", "updated_at": "2026-11-21T14:15:45.606Z" },
+                { "id": "U8ENG", "name": "Unit8 Sports English ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/unit8eng", "category": "Football", "logourl": "", "updated_at": "2026-11-21T14:15:52.192Z" },
+                { "id": "SLiV1", "name": "Sony Liv English 1", "iframeSrc": "https://sonucdn-v5.pages.dev/star.html?id=STEN1", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:38:59.994Z" },
+                { "id": "SLiV2", "name": "Sony Liv English 2", "iframeSrc": "https://sonucdn-v5.pages.dev/star.html?id=STEN2", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:39:06.349Z" },
+                { "id": "SLiV3", "name": "Sony Liv Hindi 3 ", "iframeSrc": "https://sonucdn-v5.pages.dev/star.html?id=STEN3", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:39:15.566Z" },
+                { "id": "SLiV5", "name": "Sony Liv English 5", "iframeSrc": "https://sonucdn-v5.pages.dev/star.html?id=STEN5", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:39:22.957Z" },
+                { "id": "S1", "name": "Sony Sports 1 ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten1", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:40:01.642Z" },
+                { "id": "S2", "name": "Sony Sports 2", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten2", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:39:45.292Z" },
+                { "id": "S3", "name": "Sony Sports 3 ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten3", "category": "Cricket", "logourl": "", "updated_at": "2026-11-18T16:08:57.377Z" },
+                { "id": "S4", "name": "Sony Sports Tamil ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten4kan.html", "category": "Cricket", "logourl": "", "updated_at": "2026-11-13T03:39:06.674Z" },
+                { "id": "S4X", "name": "Sony Sports Telugu ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten4tel", "category": "Cricket", "logourl": "", "updated_at": "2026-11-13T03:38:15.648Z" },
+                { "id": "S5", "name": "Sony Sports 5", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten5", "category": "Cricket", "logourl": "", "updated_at": "2026-11-09T21:40:15.963Z" },
+                { "id": "SSK", "name": "Star Sports Khal", "iframeSrc": "https://sonucdn-v5.pages.dev/star?id=SSK", "category": "Cricket", "logourl": "", "updated_at": "2026-11-16T12:18:27.551Z" },
+                { "id": "Prime", "name": "Hindi - Amazon Prime ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/prime.html", "category": "Temporarily", "logourl": "", "updated_at": "2026-11-20T10:31:30.890Z" },
+                { "id": "Prime-eng", "name": "English - Amazon Prime ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/prime-eng", "category": "Temporarily", "logourl": "", "updated_at": "2026-11-09T21:41:02.625Z" },
+                { "id": "IOS-2", "name": "IPHONE &  IOS User 2 Server ", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ios", "category": "Temporarily", "logourl": "", "updated_at": "2026-11-21T14:59:06.535Z" },
+                { "id": "IOS3", "name": "iOS User 3", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten5", "category": "Temporarily", "logourl": "", "updated_at": "2026-11-18T16:09:15.234Z" },
+                { "id": "IOS2", "name": "iOS User 4", "iframeSrc": "https://sonucdn-v5.pages.dev/channel/ten5", "category": "Temporarily", "logourl": "", "updated_at": "2026-11-18T16:09:19.784Z" }
+            ]
+        };
+
+        const CUSTOM_CHANNEL_NAMES = {
+            "Hindi": "Sony Sports 3 Hindi",
+            "English": "Sony Sports 1 English",
+            "Tamil": "Sony Sports Tamil",
+            "Telugu": "Sony Sports Telugu",
+            "STAR": "Star Sports Hindi",
+            "SD": "Star Sports Hindi (SD)",
+            "STAREN": "Star Sports English",
+            "Willow": "Willow By Cricbuzz WorldWide",
+            "Willow-2": "Willow By Cricbuzz (Server 2)",
+            "Willow-3": "Willow By Cricbuzz (Server 3)",
+            "Willow-4": "Willow By Cricbuzz (Server 4)",
+            "TNT": "TNT Sports",
+            "S1": "Sony Sports 1 (Server 2)",
+            "SLiV1": "Sony Sports 1 (Server 3)",
+            "TEN 1": "Sony Sports 1 (iOS)",
+            "S2": "Sony Sports 2",
+            "SLiV2": "Sony Sports 2 (Server 2)",
+            "S3": "Sony Sports 3 (Server 2)",
+            "SLiV3": "Sony Sports 3 (Server 3)",
+            "IOS-2": "Sony Sports 3 (iOS)",
+            "S4": "Sony Sports Tamil (Server 2)",
+            "S4X": "Sony Sports Telugu (Server 2)",
+            "S5": "Sony Sports 5 (Server 1)",
+            "SLiV5": "Sony Sports 5 (Server 2)",
+            "IOS3": "Sony Sports 5 (Server 3)",
+            "IOS2": "Sony Sports 5 (iOS)"
+        };
+
+        const CHANNELS = API_DATA.iframes.map(ch => ({
+            ...ch,
+            cleanName: CUSTOM_CHANNEL_NAMES[ch.id] || ch.name.trim()
+        }));
+
+        // Grouped Multi-Server Cards
+        const CHANNEL_GROUPS = {
+            "SONY_1_GROUP": {
+                groupId: "SONY_1_GROUP",
+                displayId: "SONY 1",
+                cleanName: "Sony Sports 1 English",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Main HD Feed", id: "English" },
+                    { label: "Server 2", sub: "Ten 1 Feed", id: "S1" },
+                    { label: "Server 3", sub: "Sony Liv Feed", id: "SLiV1" },
+                    { label: "iOS", sub: "iPhone & iPad Stream", id: "TEN 1" }
+                ]
+            },
+            "SONY_2_GROUP": {
+                groupId: "SONY_2_GROUP",
+                displayId: "SONY 2",
+                cleanName: "Sony Sports 2 English",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Ten 2 HD Feed", id: "S2" },
+                    { label: "Server 2", sub: "Sony Liv 2 Feed", id: "SLiV2" }
+                ]
+            },
+            "SONY_3_GROUP": {
+                groupId: "SONY_3_GROUP",
+                displayId: "SONY 3",
+                cleanName: "Sony Sports 3 Hindi",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Main Hindi HD", id: "Hindi" },
+                    { label: "Server 2", sub: "Ten 3 Hindi", id: "S3" },
+                    { label: "Server 3", sub: "Sony Liv Hindi", id: "SLiV3" },
+                    { label: "iOS", sub: "iPhone & iPad Stream", id: "IOS-2" }
+                ]
+            },
+            "SONY_TAMIL_GROUP": {
+                groupId: "SONY_TAMIL_GROUP",
+                displayId: "SONY TAMIL",
+                cleanName: "Sony Sports Tamil",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Main Tamil HD", id: "Tamil" },
+                    { label: "Server 2", sub: "Ten 4 Tamil Feed", id: "S4" }
+                ]
+            },
+            "SONY_TELUGU_GROUP": {
+                groupId: "SONY_TELUGU_GROUP",
+                displayId: "SONY TELUGU",
+                cleanName: "Sony Sports Telugu",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Main Telugu HD", id: "Telugu" },
+                    { label: "Server 2", sub: "Ten 4 Telugu Feed", id: "S4X" }
+                ]
+            },
+            "SONY_5_GROUP": {
+                groupId: "SONY_5_GROUP",
+                displayId: "SONY 5",
+                cleanName: "Sony Sports 5",
+                category: "Cricket",
+                brandHint: "sony",
+                servers: [
+                    { label: "Server 1", sub: "Ten 5 HD Feed", id: "S5" },
+                    { label: "Server 2", sub: "Sony Liv 5 Feed", id: "SLiV5" },
+                    { label: "Server 3", sub: "Backup HD Feed", id: "IOS3" },
+                    { label: "iOS", sub: "iPhone & iPad Stream", id: "IOS2" }
+                ]
+            },
+            "STAR_HINDI_GROUP": {
+                groupId: "STAR_HINDI_GROUP",
+                displayId: "STAR HINDI",
+                cleanName: "Star Sports Hindi",
+                category: "Cricket",
+                brandHint: "star",
+                servers: [
+                    { label: "Server 1", sub: "Star Sports Hindi HD", id: "STAR" },
+                    { label: "Server 2", sub: "Star Sports Hindi SD", id: "SD" }
+                ]
+            },
+            "WILLOW_GROUP": {
+                groupId: "WILLOW_GROUP",
+                displayId: "WILLOW",
+                cleanName: "Willow By Cricbuzz WorldWide",
+                category: "Cricket",
+                brandHint: "willow",
+                servers: [
+                    { label: "Server 1", sub: "Willow Worldwide Main", id: "Willow" },
+                    { label: "Server 2", sub: "Willow Feed 2", id: "Willow-2" },
+                    { label: "Server 3", sub: "Willow Feed 3", id: "Willow-3" },
+                    { label: "Server 4", sub: "Willow Feed 4", id: "Willow-4" }
+                ]
+            }
+        };
+
+        // IDs absorbed into the multi-server cards
+        const GROUPED_MEMBER_IDS = new Set([
+            "English", "S1", "SLiV1", "TEN 1",
+            "S2", "SLiV2",
+            "Hindi", "S3", "SLiV3", "IOS-2",
+            "Tamil", "S4",
+            "Telugu", "S4X",
+            "S5", "SLiV5", "IOS3", "IOS2",
+            "STAR", "SD",
+            "Willow", "Willow-2", "Willow-3", "Willow-4"
+        ]);
+
+        const HIDDEN_DIRECTORY_IDS = new Set([
+            "Exp",
+            "VETO"
+        ]);
+
+        function getDirectoryItems() {
+            const items = [
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_3_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_1_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_2_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_TAMIL_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_TELUGU_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.SONY_5_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.STAR_HINDI_GROUP },
+                { isGroup: true, ...CHANNEL_GROUPS.WILLOW_GROUP }
+            ];
+
+            CHANNELS.forEach(ch => {
+                if (!GROUPED_MEMBER_IDS.has(ch.id) && !HIDDEN_DIRECTORY_IDS.has(ch.id)) {
+                    items.push({
+                        isGroup: false,
+                        ...ch,
+                        displayId: ch.id
+                    });
+                }
+            });
+
+            return items;
+        }
+
+        // State Variables
+        let activeCategory = 'All Channels';
+        let searchQuery = '';
+        let currentPlayingId = null;
+
+        const NETWORK_CATEGORIES = [
+            'All Channels',
+            'Sony Network',
+            'Star Network',
+            'Willow Channels',
+            'Prime Network',
+            'FanCode & Special'
+        ];
+
+        function getNetworkCategory(item) {
+            const name = (item.cleanName || '').toLowerCase();
+            const id = (item.displayId || item.id || '').toLowerCase();
+            const hint = (item.brandHint || '').toLowerCase();
+
+            if (hint === 'sony' || name.includes('sony') || id.startsWith('sony') || id.startsWith('sliv')) {
+                return 'Sony Network';
+            }
+            if (hint === 'star' || name.includes('star') || id.startsWith('star') || id === 'ssk' || id === 'sd') {
+                return 'Star Network';
+            }
+            if (hint === 'willow' || name.includes('willow') || name.includes('cricbuzz') || id.startsWith('willow') || id.startsWith('cricbuzz')) {
+                return 'Willow Channels';
+            }
+            if (hint === 'prime' || name.includes('prime') || id.startsWith('prime')) {
+                return 'Prime Network';
+            }
+            if (name.includes('fancode') || name.includes('unit8') || id === 'fc' || id === 'fc2' || id.startsWith('u8')) {
+                return 'FanCode & Special';
+            }
+            return 'Other';
+        }
+
+        function renderCategoryFilters() {
+            const container = document.getElementById('category-filters');
+            if (!container) return;
+
+            container.innerHTML = NETWORK_CATEGORIES.map(cat => {
+                const isActive = activeCategory === cat;
+                const activeClasses = isActive
+                    ? 'bg-sky-400 text-slate-950 font-semibold shadow-lg shadow-sky-500/25 border-sky-400'
+                    : 'glass-panel text-slate-300 hover:text-white hover:border-white/20 border-white/10';
+
+                return `
+                    <button
+                        onclick="setNetworkCategory('${cat}')"
+                        class="px-4 py-2 rounded-full text-xs sm:text-sm border whitespace-nowrap transition-all duration-200 cursor-pointer ${activeClasses}"
+                    >
+                        ${cat}
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function setNetworkCategory(category) {
+            activeCategory = category;
+            renderCategoryFilters();
+            renderChannelsGrid();
+        }
+
+        /**
+         * 2. CUSTOM DYNAMIC POSTER GENERATOR
+         */
+        function getCustomPosterMarkup(item) {
+            const nameLower = item.cleanName.toLowerCase();
+            const badgeText = item.displayId || item.id;
+            
+            let gradient = 'from-sky-900 via-indigo-950 to-slate-950';
+            let accentGlow = 'bg-sky-500/30';
+            let brandTag = 'HD BROADCAST';
+            let iconClass = 'fa-satellite-dish';
+
+            if (nameLower.includes('star') || item.brandHint === 'star') {
+                gradient = 'from-blue-900 via-indigo-950 to-slate-950';
+                accentGlow = 'bg-blue-500/35';
+                brandTag = item.isGroup ? `${item.servers.length} SERVERS AVAILABLE` : 'STAR NETWORK';
+                iconClass = 'fa-star';
+            } else if (nameLower.includes('sony') || item.brandHint === 'sony') {
+                gradient = 'from-purple-900 via-fuchsia-950 to-slate-950';
+                accentGlow = 'bg-purple-500/35';
+                brandTag = item.isGroup ? `${item.servers.length} SERVERS AVAILABLE` : 'SONY SPORTS';
+                iconClass = 'fa-trophy';
+            } else if (nameLower.includes('willow') || nameLower.includes('cricbuzz') || item.brandHint === 'willow') {
+                gradient = 'from-emerald-900 via-teal-950 to-slate-950';
+                accentGlow = 'bg-emerald-500/35';
+                brandTag = item.isGroup ? `${item.servers.length} SERVERS AVAILABLE` : 'CRICKET WORLDWIDE';
+                iconClass = 'fa-baseball-bat-ball';
+            } else if (nameLower.includes('tnt') || nameLower.includes('football') || item.category === 'Football') {
+                gradient = 'from-rose-900 via-pink-950 to-slate-950';
+                accentGlow = 'bg-rose-500/35';
+                brandTag = 'PRO SPORTS LIVE';
+                iconClass = 'fa-futbol';
+            } else if (nameLower.includes('prime')) {
+                gradient = 'from-cyan-900 via-blue-950 to-slate-950';
+                accentGlow = 'bg-cyan-500/35';
+                brandTag = 'PRIME SPORTS';
+                iconClass = 'fa-bolt';
+            } else if (nameLower.includes('ios') || nameLower.includes('iphone')) {
+                gradient = 'from-slate-800 via-zinc-900 to-slate-950';
+                accentGlow = 'bg-white/20';
+                brandTag = 'APPLE / iOS OPTIMIZED';
+                iconClass = 'fa-mobile-screen-button';
+            }
+
+            const customLogoImg = item.logourl && item.logourl.trim() !== '' 
+                ? `<img src="${item.logourl}" alt="${item.cleanName}" onerror="this.style.display='none'" class="w-16 h-16 object-contain rounded-xl mb-1 drop-shadow-lg">`
+                : '';
+
+            const safeKey = badgeText.replace(/[^a-zA-Z0-9]/g, '');
+
+            return `
+                <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-gradient-to-br ${gradient} border border-white/10 flex flex-col items-center justify-center p-4 select-none">
+                    <svg class="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <pattern id="grid-${safeKey}" width="24" height="24" patternUnits="userSpaceOnUse">
+                                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#grid-${safeKey})" />
+                    </svg>
+
+                    <div class="absolute w-28 h-28 ${accentGlow} rounded-full blur-2xl group-hover:scale-150 transition-transform duration-500"></div>
+
+                    <div class="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-black/55 backdrop-blur-md border border-white/10">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                        <span class="text-[10px] font-bold tracking-wider text-white uppercase">LIVE</span>
+                    </div>
+
+                    <div class="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-white/10 backdrop-blur-md text-[10px] font-medium text-slate-200">
+                        ${item.isGroup ? `<i class="fa-solid fa-layer-group mr-1 text-sky-400"></i>${item.servers.length} Servers` : (getNetworkCategory(item) !== 'Other' ? getNetworkCategory(item) : item.category)}
+                    </div>
+
+                    <div class="relative z-10 flex flex-col items-center text-center">
+                        ${customLogoImg}
+                        <div class="flex items-center gap-2 mb-1">
+                            <i class="fa-solid ${iconClass} text-white/80 text-sm"></i>
+                            <span class="font-display font-black text-xl sm:text-2xl tracking-wider text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]">
+                                ${badgeText}
+                            </span>
+                        </div>
+                        <span class="text-[10px] font-semibold tracking-[0.18em] text-white/60 uppercase">
+                            ${brandTag}
+                        </span>
+                    </div>
+
+                    <i class="fa-solid ${iconClass} absolute -bottom-2 -right-2 text-4xl text-white/[0.04] pointer-events-none"></i>
+
+                    <div class="absolute inset-0 bg-slate-950/45 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity duration-200 flex items-center justify-center z-20">
+                        <div class="w-12 h-12 rounded-full bg-sky-400 text-slate-950 flex items-center justify-center shadow-lg shadow-sky-400/30 transform scale-90 group-hover:scale-100 group-focus-visible:scale-100 transition-transform duration-200">
+                            <i class="fa-solid ${item.isGroup ? 'fa-server' : 'fa-play'} text-base ${item.isGroup ? '' : 'ml-0.5'}"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        /**
+         * 3. RENDER DIRECTORY GRID & SERVER MODAL
+         */
+        function renderChannelsGrid() {
+            const grid = document.getElementById('channels-grid');
+            const emptyState = document.getElementById('empty-state');
+            const badge = document.getElementById('total-channels-badge');
+
+            if (!grid) return;
+
+            const query = searchQuery.trim().toLowerCase();
+            const allItems = getDirectoryItems();
+
+            const filtered = allItems.filter(item => {
+                const matchesCategory = activeCategory === 'All Channels' || getNetworkCategory(item) === activeCategory;
+                if (!matchesCategory) return false;
+
+                if (!query) return true;
+                const nameMatch = (item.cleanName || '').toLowerCase().includes(query);
+                const idMatch = (item.displayId || item.id || '').toLowerCase().includes(query);
+                const catMatch = (item.category || '').toLowerCase().includes(query);
+                const netMatch = getNetworkCategory(item).toLowerCase().includes(query);
+                const serverMatch = item.isGroup && item.servers.some(s =>
+                    s.label.toLowerCase().includes(query) ||
+                    s.sub.toLowerCase().includes(query) ||
+                    s.id.toLowerCase().includes(query)
+                );
+
+                return nameMatch || idMatch || catMatch || netMatch || serverMatch;
+            });
+
+            if (badge) {
+                badge.textContent = `${CHANNELS.length - HIDDEN_DIRECTORY_IDS.size} CHANNELS LIVE`;
+            }
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = filtered.map(item => {
+                const actionAttr = item.isGroup
+                    ? `onclick="openServerModal('${item.groupId}')"`
+                    : `onclick="selectChannel(event, '${item.id}')"`;
+
+                const subtitleText = item.isGroup
+                    ? `${item.servers.length} servers • ${item.servers.map(s => s.label).join(', ')}`
+                    : `${getNetworkCategory(item) !== 'Other' ? getNetworkCategory(item) : item.category} • ID: ${item.id}`;
+
+                return `
+                    <article
+                        tabindex="0"
+                        role="button"
+                        ${actionAttr}
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                        class="channel-card group glass-panel rounded-2xl p-3 cursor-pointer flex flex-col justify-between"
+                    >
+                        <div>
+                            ${getCustomPosterMarkup(item)}
+                            <div class="mt-3 px-1">
+                                <div class="flex items-start justify-between gap-2">
+                                    <h3 class="font-semibold text-sm sm:text-base text-white group-hover:text-sky-300 transition-colors line-clamp-1">
+                                        ${item.cleanName}
+                                    </h3>
+                                    <span class="shrink-0 text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/10">
+                                        ${item.displayId || item.id}
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-1 line-clamp-1">
+                                    ${subtitleText}
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+                `;
+            }).join('');
+        }
+
+        function openServerModal(groupId) {
+            const group = CHANNEL_GROUPS[groupId];
+            if (!group) return;
+
+            const modal = document.getElementById('server-modal');
+            const titleEl = document.getElementById('modal-channel-title');
+            const listEl = document.getElementById('modal-server-list');
+
+            titleEl.textContent = group.cleanName;
+            listEl.innerHTML = group.servers.map(srv => `
+                <button
+                    onclick="closeServerModal(); selectChannel(event, '${srv.id}');"
+                    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-900/90 hover:bg-sky-500/15 border border-white/10 hover:border-sky-400/50 text-left transition-all group cursor-pointer"
+                >
+                    <div>
+                        <div class="text-sm font-semibold text-white group-hover:text-sky-300 transition-colors">${srv.label}</div>
+                        <div class="text-xs text-slate-400">${srv.sub}</div>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-sky-400 font-medium">
+                        <span>Play</span>
+                        <i class="fa-solid fa-play text-[10px]"></i>
+                    </div>
+                </button>
+            `).join('');
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeServerModal() {
+            const modal = document.getElementById('server-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        /**
+         * 4. ROUTING & PLAYBACK ENGINE (?id=CHANNEL_ID)
+         */
+        function populateQuickChannelSelect() {
+            const select = document.getElementById('quick-channel-select');
+            if (!select) return;
+
+            select.innerHTML = CHANNELS.map(ch =>
+                `<option value="${encodeURIComponent(ch.id)}">${ch.cleanName} (${ch.id})</option>`
+            ).join('');
+        }
+
+        function selectChannel(event, channelId) {
+            if (event) event.preventDefault();
+            const decodedId = decodeURIComponent(channelId || '');
+            const channel = CHANNELS.find(c => c.id.toLowerCase() === decodedId.toLowerCase());
+
+            if (!channel) {
+                showToast(`Channel "${decodedId}" not found.`);
+                navigateToDirectory(null);
+                return;
+            }
+
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('id', channel.id);
+                window.history.pushState({ channelId: channel.id }, '', url.toString());
+            } catch (err) {
+                // Fallback if history pushState is restricted
+            }
+
+            launchPlayer(channel);
+        }
+
+        function launchPlayer(channel) {
+            currentPlayingId = channel.id;
+
+            const directoryView = document.getElementById('directory-view');
+            const playerView = document.getElementById('player-view');
+            const iframe = document.getElementById('stream-iframe');
+            const loader = document.getElementById('iframe-loader');
+            const loadingLabel = document.getElementById('loading-channel-name');
+            const select = document.getElementById('quick-channel-select');
+
+            directoryView.classList.add('hidden');
+            playerView.classList.remove('hidden');
+            document.title = `${channel.cleanName} | HELIXPULL`;
+
+            if (loadingLabel) {
+                loadingLabel.textContent = `Loading ${channel.cleanName}...`;
+            }
+            if (loader) {
+                loader.classList.remove('opacity-0');
+            }
+
+            populateQuickChannelSelect();
+            if (select) {
+                select.value = encodeURIComponent(channel.id);
+            }
+
+            if (iframe) {
+                iframe.onload = () => {
+                    if (loader) {
+                        loader.classList.add('opacity-0');
+                    }
+                };
+                iframe.src = channel.iframeSrc;
+            }
+        }
+
+        function navigateToDirectory(event) {
+            if (event) event.preventDefault();
+            currentPlayingId = null;
+
+            const directoryView = document.getElementById('directory-view');
+            const playerView = document.getElementById('player-view');
+            const iframe = document.getElementById('stream-iframe');
+
+            if (iframe) {
+                iframe.src = '';
+            }
+            playerView.classList.add('hidden');
+            directoryView.classList.remove('hidden');
+            document.title = 'HELIXPULL | Live Sports & Broadcast';
+
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('id');
+                window.history.pushState({}, '', url.toString());
+            } catch (err) {
+                // Ignore if restricted
+            }
+
+            renderCategoryFilters();
+            renderChannelsGrid();
+        }
+
+        function switchAdjacentChannel(delta) {
+            if (!CHANNELS.length) return;
+            const currentIndex = CHANNELS.findIndex(c => c.id === currentPlayingId);
+            const startIndex = currentIndex === -1 ? 0 : currentIndex;
+            const nextIndex = (startIndex + delta + CHANNELS.length) % CHANNELS.length;
+            selectChannel(null, CHANNELS[nextIndex].id);
+        }
+
+        function handleRoute() {
+            const params = new URLSearchParams(window.location.search);
+            const channelId = params.get('id');
+
+            if (channelId) {
+                const found = CHANNELS.find(c => c.id.toLowerCase() === channelId.toLowerCase());
+                if (found) {
+                    launchPlayer(found);
+                    return;
+                }
+            }
+
+            const directoryView = document.getElementById('directory-view');
+            const playerView = document.getElementById('player-view');
+            const iframe = document.getElementById('stream-iframe');
+            if (iframe) iframe.src = '';
+            playerView.classList.add('hidden');
+            directoryView.classList.remove('hidden');
+            document.title = 'HELIXPULL | Live Sports & Broadcast';
+
+            renderCategoryFilters();
+            renderChannelsGrid();
+        }
+
+        function resetFilters() {
+            activeCategory = 'All Channels';
+            searchQuery = '';
+            const searchInput = document.getElementById('search-input');
+            const clearBtn = document.getElementById('clear-search');
+            if (searchInput) searchInput.value = '';
+            if (clearBtn) clearBtn.classList.add('hidden');
+            renderCategoryFilters();
+            renderChannelsGrid();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-box');
+            const toastMsg = document.getElementById('toast-message');
+            if (!toast || !toastMsg) return;
+            toastMsg.textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(showToast._timer);
+            showToast._timer = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        /**
+         * 7. LIGHTWEIGHT SPORTS PARTICLE & STADIUM MOTIF CANVAS
+         */
+        function initParticleCanvas() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d', { alpha: true });
+            let width, height, particles;
+            let animFrameId = null;
+
+            const isTouchOrTV = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+            const mouse = { x: null, y: null, radius: 110 };
+
+            if (!isTouchOrTV) {
+                window.addEventListener('mousemove', (e) => {
+                    mouse.x = e.clientX;
+                    mouse.y = e.clientY;
+                }, { passive: true });
+
+                window.addEventListener('mouseout', () => {
+                    mouse.x = null;
+                    mouse.y = null;
+                }, { passive: true });
+            }
+
+            function resize() {
+                const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width * dpr;
+                canvas.height = height * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                createParticles();
+            }
+
+            function drawSportsIcon(ctx, type, x, y, size, rotation, alpha) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(rotation);
+                ctx.strokeStyle = `rgba(148, 163, 184, ${alpha})`;
+                ctx.lineWidth = 1.1;
+
+                if (type === 0) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size * 0.65, -0.8, 0.8);
+                    ctx.stroke();
+                } else if (type === 1) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, size, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    for (let i = 0; i < 5; i++) {
+                        const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
+                        const px = Math.cos(angle) * (size * 0.45);
+                        const py = Math.sin(angle) * (size * 0.45);
+                        if (i === 0) ctx.moveTo(px, py);
+                        else ctx.lineTo(px, py);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(-size * 0.6, -size * 0.6);
+                    ctx.lineTo(size * 0.6, -size * 0.6);
+                    ctx.lineTo(size * 0.3, size * 0.2);
+                    ctx.lineTo(-size * 0.3, size * 0.2);
+                    ctx.closePath();
+                    ctx.moveTo(0, size * 0.2);
+                    ctx.lineTo(0, size * 0.7);
+                    ctx.moveTo(-size * 0.45, size * 0.7);
+                    ctx.lineTo(size * 0.45, size * 0.7);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            class Particle {
+                constructor(isSportsMotif = false) {
+                    this.isSportsMotif = isSportsMotif;
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * (isSportsMotif ? 0.25 : 0.4);
+                    this.vy = (Math.random() - 0.5) * (isSportsMotif ? 0.25 : 0.4);
+                    this.size = isSportsMotif ? (Math.random() * 4 + 7) : (Math.random() * 1.8 + 0.6);
+                    this.rotation = Math.random() * Math.PI * 2;
+                    this.vRot = (Math.random() - 0.5) * 0.006;
+                    this.sportType = Math.floor(Math.random() * 3);
+                    this.color = Math.random() > 0.5 ? 'rgba(56, 189, 248, 0.42)' : 'rgba(129, 140, 248, 0.35)';
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.isSportsMotif) this.rotation += this.vRot;
+
+                    if (this.x < -20) this.x = width + 20;
+                    if (this.x > width + 20) this.x = -20;
+                    if (this.y < -20) this.y = height + 20;
+                    if (this.y > height + 20) this.y = -20;
+
+                    if (!isTouchOrTV && mouse.x !== null && mouse.y !== null) {
+                        const dx = this.x - mouse.x;
+                        const dy = this.y - mouse.y;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq < mouse.radius * mouse.radius) {
+                            const dist = Math.sqrt(distSq) || 1;
+                            const force = (mouse.radius - dist) / mouse.radius;
+                            this.x += (dx / dist) * force * 1.1;
+                            this.y += (dy / dist) * force * 1.1;
+                        }
+                    }
+                }
+
+                draw() {
+                    if (this.isSportsMotif) {
+                        drawSportsIcon(ctx, this.sportType, this.x, this.y, this.size, this.rotation, 0.14);
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                        ctx.fillStyle = this.color;
+                        ctx.fill();
+                    }
+                }
+            }
+
+            function createParticles() {
+                const maxDots = isTouchOrTV ? 28 : 48;
+                const dotCount = Math.min(Math.floor((width * height) / 26000), maxDots);
+                const sportsIconCount = isTouchOrTV ? 5 : 9;
+
+                particles = [];
+                for (let i = 0; i < dotCount; i++) {
+                    particles.push(new Particle(false));
+                }
+                for (let i = 0; i < sportsIconCount; i++) {
+                    particles.push(new Particle(true));
+                }
+            }
+
+            function animate() {
+                const isDirectoryVisible = !document.getElementById('directory-view').classList.contains('hidden');
+                if (isDirectoryVisible && !document.hidden) {
+                    ctx.clearRect(0, 0, width, height);
+
+                    for (let i = 0; i < particles.length; i++) {
+                        particles[i].update();
+                        particles[i].draw();
+
+                        if (!particles[i].isSportsMotif) {
+                            for (let j = i + 1; j < particles.length; j++) {
+                                if (particles[j].isSportsMotif) continue;
+                                const dx = particles[i].x - particles[j].x;
+                                const dy = particles[i].y - particles[j].y;
+                                const distSq = dx * dx + dy * dy;
+
+                                if (distSq < 11000) {
+                                    const alpha = 0.11 * (1 - distSq / 11000);
+                                    ctx.beginPath();
+                                    ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+                                    ctx.lineWidth = 0.6;
+                                    ctx.moveTo(particles[i].x, particles[i].y);
+                                    ctx.lineTo(particles[j].x, particles[j].y);
+                                    ctx.stroke();
+                                }
+                            }
+                        }
+                    }
+                }
+                animFrameId = requestAnimationFrame(animate);
+            }
+
+            let resizeTimer;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(resize, 150);
+            }, { passive: true });
+
+            resize();
+            animate();
+        }
+
+        /**
+         * SMART TV & KEYBOARD D-PAD SPATIAL NAVIGATION
+         */
+        function initTVRemoteNavigation() {
+            document.addEventListener('keydown', (e) => {
+                const isPlayerVisible = !document.getElementById('player-view').classList.contains('hidden');
+                const isModalOpen = !document.getElementById('server-modal').classList.contains('hidden');
+
+                if (isPlayerVisible && document.activeElement.tagName !== 'SELECT') {
+                    if (e.key === 'ArrowLeft') {
+                        switchAdjacentChannel(-1);
+                    } else if (e.key === 'ArrowRight') {
+                        switchAdjacentChannel(1);
+                    } else if (e.key === 'Backspace' || e.key === 'Escape') {
+                        navigateToDirectory(e);
+                    }
+                    return;
+                }
+
+                if (isModalOpen) {
+                    if (e.key === 'Escape') closeServerModal();
+                    return;
+                }
+
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    const activeEl = document.activeElement;
+                    if (activeEl && activeEl.tagName === 'INPUT') return;
+
+                    const cards = Array.from(document.querySelectorAll('#channels-grid .channel-card'));
+                    if (cards.length === 0) return;
+
+                    const currentIndex = cards.indexOf(activeEl);
+                    if (currentIndex === -1) {
+                        e.preventDefault();
+                        cards[0].focus();
+                        return;
+                    }
+
+                    const firstTop = cards[0].offsetTop;
+                    let cols = cards.findIndex(c => c.offsetTop > firstTop);
+                    if (cols === -1) cols = cards.length;
+
+                    let targetIndex = currentIndex;
+                    if (e.key === 'ArrowRight') targetIndex = Math.min(currentIndex + 1, cards.length - 1);
+                    if (e.key === 'ArrowLeft') targetIndex = Math.max(currentIndex - 1, 0);
+                    if (e.key === 'ArrowDown') targetIndex = Math.min(currentIndex + cols, cards.length - 1);
+                    if (e.key === 'ArrowUp') targetIndex = Math.max(currentIndex - cols, 0);
+
+                    if (targetIndex !== currentIndex) {
+                        e.preventDefault();
+                        cards[targetIndex].focus();
+                        cards[targetIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            });
+        }
+
+        /**
+         * 8. EVENT LISTENERS & INITIALIZATION
+         */
+        window.addEventListener('DOMContentLoaded', () => {
+            initParticleCanvas();
+            initTVRemoteNavigation();
+
+            const searchInput = document.getElementById('search-input');
+            const clearBtn = document.getElementById('clear-search');
+
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                if (searchQuery.length > 0) {
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    clearBtn.classList.add('hidden');
+                }
+                renderChannelsGrid();
+            });
+
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                searchQuery = '';
+                clearBtn.classList.add('hidden');
+                renderChannelsGrid();
+            });
+
+            document.getElementById('quick-channel-select').addEventListener('change', (e) => {
+                selectChannel(null, e.target.value);
+            });
+
+            window.addEventListener('popstate', handleRoute);
+
+            handleRoute();
+        });
+    </script>
+</body>
+</html>
